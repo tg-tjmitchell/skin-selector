@@ -2,10 +2,13 @@
   "name": "league-skin-selector",
   "version": "1.0.0",
   "description": "League of Legends skin selector using LCU API",
-  "main": "src/index.js",
+  "main": "src/electron-main.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node src/index.js"
+    "dev": "node src/index.js",
+    "electron": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "keywords": [
     "league of legends",
@@ -18,5 +21,24 @@
     "axios": "^1.6.0",
     "express": "^4.18.2",
     "https": "^1.0.0"
+  },
+  "devDependencies": {
+    "electron": "^40.1.0",
+    "electron-builder": "^26.4.0"
+  },
+  "overrides": {
+    "rimraf": "4.4.1"
+  },
+  "build": {
+    "appId": "com.league.skinselector",
+    "productName": "League Skin Selector",
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    }
   }
 }

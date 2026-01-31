@@ -210,10 +210,30 @@ class LCUConnector {
         // e.g., Caitlyn (51) skin 5 = 51005
         const skinNum = skin.id % 1000;
         
+        // Map chromas with images
+        const chromas = (skin.chromas || []).map(chroma => {
+          const chromaPath = chroma.chromaPath || '';
+          // Extract chroma number from path if available
+          const chromaMatch = chromaPath.match(/(\d+)\.(png|jpg)$/i);
+          const chromaNum = chromaMatch ? chromaMatch[1] : chroma.id;
+          
+          return {
+            id: chroma.id,
+            name: chroma.name,
+            chromaPath: chroma.chromaPath,
+            colors: chroma.colors || [],
+            owned: chroma.ownership?.owned || false,
+            // Use Community Dragon for chroma images
+            imageUrl: `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/${championId}/${chroma.id}.png`
+          };
+        }).filter(chroma => chroma.owned);
+        
         return {
           id: skin.id,
           name: skin.name,
           ownership: skin.ownership,
+          chromas: chromas,
+          hasOwnedChromas: chromas.length > 0,
           // Use loading screen image (full champion art)
           loadingUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championName}_${skinNum}.jpg`
         };
@@ -231,7 +251,7 @@ class LCUConnector {
   /**
    * Select a skin in champion select
    */
-  async selectSkin(championId, skinId) {
+  async selectSkin(championId, skinId, chromaId = null) {
     try {
       const session = await this.getChampSelectSession();
       if (!session) {
@@ -247,12 +267,24 @@ class LCUConnector {
         completed: true
       });
 
-      // Select the skin
-      await this.patch('/lol-champ-select/v1/session/my-selection', {
+      // Select the skin with optional chroma
+      const selectionData = {
         selectedSkinId: skinId
-      });
+      };
+      
+      if (chromaId) {
+        selectionData.wardSkinId = -1; // Required for chroma selection
+        await this.patch('/lol-champ-select/v1/session/my-selection', selectionData);
+        // Select the chroma in a separate call
+        await this.patch('/lol-champ-select/v1/session/my-selection', {
+          selectedSkinId: chromaId
+        });
+        console.log(`Successfully selected skin ID: ${skinId} with chroma ID: ${chromaId}`);
+      } else {
+        await this.patch('/lol-champ-select/v1/session/my-selection', selectionData);
+        console.log(`Successfully selected skin ID: ${skinId}`);
+      }
 
-      console.log(`Successfully selected skin ID: ${skinId}`);
       return true;
     } catch (error) {
       throw new Error(`Failed to select skin: ${error.message}`);

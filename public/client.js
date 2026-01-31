@@ -3,6 +3,7 @@ class SkinSelectorUI {
         this.autoMode = false;
         this.currentChampionId = null;
         this.currentSkins = [];
+        this.selectedSkin = null;
         this.init();
     }
 
@@ -21,6 +22,10 @@ class SkinSelectorUI {
             selectedChampion: document.getElementById('selectedChampion'),
             skinSelectionArea: document.getElementById('skinSelectionArea'),
             skinGrid: document.getElementById('skinGrid'),
+            chromaSelectionArea: document.getElementById('chromaSelectionArea'),
+            chromaGrid: document.getElementById('chromaGrid'),
+            selectedSkinName: document.getElementById('selectedSkinName'),
+            backToSkinsBtn: document.getElementById('backToSkinsBtn'),
             autoSelectBtn: document.getElementById('autoSelectBtn'),
             refreshBtn: document.getElementById('refreshBtn'),
             manualModeBtn: document.getElementById('manualModeBtn'),
@@ -33,6 +38,10 @@ class SkinSelectorUI {
     setupEventListeners() {
         this.elements.autoSelectBtn.addEventListener('click', () => this.autoSelectRandomSkin());
         this.elements.refreshBtn.addEventListener('click', () => this.refreshSkins());
+        
+        if (this.elements.backToSkinsBtn) {
+            this.elements.backToSkinsBtn.addEventListener('click', () => this.showSkinSelection());
+        }
         
         this.elements.manualModeBtn.addEventListener('click', () => this.setMode('manual'));
         this.elements.autoModeBtn.addEventListener('click', () => this.setMode('auto'));
@@ -156,6 +165,15 @@ class SkinSelectorUI {
             const skinCard = document.createElement('div');
             skinCard.className = 'skin-card';
             
+            // Add chroma indicator badge if skin has chromas
+            if (skin.hasOwnedChromas) {
+                const chromaBadge = document.createElement('div');
+                chromaBadge.className = 'chroma-badge';
+                chromaBadge.innerHTML = `<span>🎨 ${skin.chromas.length}</span>`;
+                chromaBadge.title = `${skin.chromas.length} chroma(s) available`;
+                skinCard.appendChild(chromaBadge);
+            }
+            
             // Try to load image
             const img = document.createElement('img');
             img.className = 'skin-image';
@@ -187,12 +205,21 @@ class SkinSelectorUI {
 
             skinCard.appendChild(img);
             skinCard.appendChild(infoDiv);
-            skinCard.addEventListener('click', () => this.selectSkin(skin.id, skin.name));
+            
+            // Click handler: if has chromas, show chroma selection; otherwise select skin directly
+            skinCard.addEventListener('click', () => {
+                if (skin.hasOwnedChromas) {
+                    this.showChromaSelection(skin);
+                } else {
+                    this.selectSkin(skin.id, skin.name);
+                }
+            });
+            
             this.elements.skinGrid.appendChild(skinCard);
         });
     }
 
-    async selectSkin(skinId, skinName) {
+    async selectSkin(skinId, skinName, chromaId = null) {
         if (!this.currentChampionId) {
             this.log('No champion selected', 'error');
             return;
@@ -206,7 +233,8 @@ class SkinSelectorUI {
                 },
                 body: JSON.stringify({
                     championId: this.currentChampionId,
-                    skinId: skinId
+                    skinId: skinId,
+                    chromaId: chromaId
                 })
             });
 
@@ -215,7 +243,10 @@ class SkinSelectorUI {
             if (result.error) {
                 this.log(`Failed to select skin: ${result.error}`, 'error');
             } else {
-                this.log(`Selected skin: ${skinName}`, 'success');
+                const message = chromaId 
+                    ? `Selected ${skinName} with chroma` 
+                    : `Selected skin: ${skinName}`;
+                this.log(message, 'success');
             }
         } catch (error) {
             this.log(`Error selecting skin: ${error.message}`, 'error');
@@ -239,6 +270,97 @@ class SkinSelectorUI {
 
         const randomSkin = this.currentSkins[Math.floor(Math.random() * this.currentSkins.length)];
         await this.selectSkin(randomSkin.id, randomSkin.name);
+    }
+
+    showChromaSelection(skin) {
+        this.selectedSkin = skin;
+        this.elements.skinSelectionArea.style.display = 'none';
+        
+        if (this.elements.chromaSelectionArea) {
+            this.elements.chromaSelectionArea.style.display = 'block';
+        }
+        
+        if (this.elements.selectedSkinName) {
+            this.elements.selectedSkinName.textContent = skin.name;
+        }
+        
+        this.renderChromas(skin);
+        this.log(`Viewing chromas for ${skin.name}`, 'info');
+    }
+
+    showSkinSelection() {
+        if (this.elements.chromaSelectionArea) {
+            this.elements.chromaSelectionArea.style.display = 'none';
+        }
+        this.elements.skinSelectionArea.style.display = 'block';
+        this.selectedSkin = null;
+    }
+
+    renderChromas(skin) {
+        if (!this.elements.chromaGrid) return;
+        
+        this.elements.chromaGrid.innerHTML = '';
+
+        // Add base skin option
+        const baseSkinCard = document.createElement('div');
+        baseSkinCard.className = 'chroma-card';
+        
+        const baseImg = document.createElement('img');
+        baseImg.className = 'chroma-image';
+        baseImg.alt = 'Base ' + skin.name;
+        baseImg.src = skin.loadingUrl;
+        baseImg.onerror = () => {
+            baseImg.style.display = 'none';
+            const placeholder = document.createElement('div');
+            placeholder.className = 'chroma-image-placeholder';
+            placeholder.textContent = '🎮';
+            baseImg.parentNode?.insertBefore(placeholder, baseImg);
+        };
+
+        const baseInfo = document.createElement('div');
+        baseInfo.className = 'chroma-info';
+        baseInfo.innerHTML = `<div class="chroma-name">Base Skin</div>`;
+
+        baseSkinCard.appendChild(baseImg);
+        baseSkinCard.appendChild(baseInfo);
+        baseSkinCard.addEventListener('click', () => {
+            this.selectSkin(skin.id, skin.name);
+            this.showSkinSelection();
+        });
+        this.elements.chromaGrid.appendChild(baseSkinCard);
+
+        // Add chromas
+        if (skin.chromas && skin.chromas.length > 0) {
+            skin.chromas.forEach(chroma => {
+                const chromaCard = document.createElement('div');
+                chromaCard.className = 'chroma-card';
+                
+                const img = document.createElement('img');
+                img.className = 'chroma-image';
+                img.alt = chroma.name;
+                img.src = chroma.imageUrl;
+                
+                img.onerror = () => {
+                    img.style.display = 'none';
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'chroma-image-placeholder';
+                    placeholder.textContent = '🎨';
+                    img.parentNode?.insertBefore(placeholder, img);
+                };
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'chroma-info';
+                infoDiv.innerHTML = `<div class="chroma-name">${chroma.name}</div>`;
+
+                chromaCard.appendChild(img);
+                chromaCard.appendChild(infoDiv);
+                chromaCard.addEventListener('click', () => {
+                    this.selectSkin(skin.id, skin.name, chroma.id);
+                    this.showSkinSelection();
+                });
+                this.elements.chromaGrid.appendChild(chromaCard);
+            });
+        }
     }
 
     log(message, type = 'info') {

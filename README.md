@@ -35,6 +35,23 @@ npm start
 4. **Enter champion select** in League of Legends
 5. **Select your skin** from the web interface or use auto mode
 
+### Electron Desktop App
+
+1. **Run the desktop app**:
+```bash
+npm run electron
+```
+
+2. The Electron window will open automatically.
+
+### Build Desktop App (Windows)
+
+```bash
+npm run dist
+```
+
+The installer will be generated in the `dist/` folder.
+
 ## How it works
 
 ### Web Interface
@@ -118,7 +135,6 @@ The app automatically detects:
 
 ## Future Enhancements
 
-- **Electron Desktop App** - Standalone application for easier use
 - **Skin Preview Images** - Display actual skin artwork
 - **Champion Stats** - Show win rates and statistics
 - **Custom Keybinds** - Quick select skins with keyboard shortcuts
