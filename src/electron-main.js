@@ -1,5 +1,5 @@
 const path = require('path');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const { startServer } = require('./index');
 
 let mainWindow;
@@ -25,6 +25,15 @@ function createWindow(port) {
     mainWindow = null;
   });
 }
+
+ipcMain.on('focus-window', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+});
 
 app.whenReady().then(async () => {
   const port = Number(process.env.PORT) || 3000;

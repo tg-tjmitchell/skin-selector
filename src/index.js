@@ -46,13 +46,16 @@ app.get('/api/status', async (req, res) => {
     }
 
     const summoner = await lcu.getCurrentSummoner();
-    const inChampSelect = await lcu.isInChampSelect();
+    const session = await lcu.getChampSelectSession();
+    const inChampSelect = session !== null;
     
     let selectedChampion = 'None';
     let selectedChampionId = null;
+    let lockedIn = false;
 
     if (inChampSelect) {
-      selectedChampionId = await lcu.getSelectedChampion();
+      selectedChampionId = lcu.getSelectedChampionFromSession(session);
+      lockedIn = lcu.isLocalPlayerLockedIn(session);
       if (selectedChampionId) {
         selectedChampion = `Champion ID: ${selectedChampionId}`;
       }
@@ -63,7 +66,8 @@ app.get('/api/status', async (req, res) => {
       summoner: summoner.displayName,
       inChampSelect: inChampSelect,
       selectedChampion: selectedChampion,
-      selectedChampionId: selectedChampionId
+      selectedChampionId: selectedChampionId,
+      lockedIn: lockedIn
     });
   } catch (error) {
     clientConnected = false;

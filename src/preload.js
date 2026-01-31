@@ -1,1 +1,5 @@
-// Preload script reserved for future safe IPC exposure.
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+	requestFocus: () => ipcRenderer.send('focus-window')
+});

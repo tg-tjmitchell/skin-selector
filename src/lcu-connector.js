@@ -147,6 +147,37 @@ class LCUConnector {
   }
 
   /**
+   * Get selected champion ID from a session payload
+   */
+  getSelectedChampionFromSession(session) {
+    if (!session) return null;
+
+    const localPlayerCellId = session.localPlayerCellId;
+    const myTeam = session.myTeam || [];
+    const myCell = myTeam.find(member => member.cellId === localPlayerCellId);
+    return myCell ? myCell.championId : null;
+  }
+
+  /**
+   * Get local player's pick action from a session payload
+   */
+  getLocalPlayerPickAction(session) {
+    if (!session || !Array.isArray(session.actions)) return null;
+
+    const localPlayerCellId = session.localPlayerCellId;
+    const actions = session.actions.flat();
+    return actions.find(action => action.actorCellId === localPlayerCellId && action.type === 'pick') || null;
+  }
+
+  /**
+   * Check if local player has locked in
+   */
+  isLocalPlayerLockedIn(session) {
+    const action = this.getLocalPlayerPickAction(session);
+    return !!action && action.completed === true;
+  }
+
+  /**
    * Get champion details by ID
    */
   async getChampion(championId) {
@@ -296,13 +327,7 @@ class LCUConnector {
    */
   async getSelectedChampion() {
     const session = await this.getChampSelectSession();
-    if (!session) return null;
-
-    const localPlayerCellId = session.localPlayerCellId;
-    const myTeam = session.myTeam || [];
-    
-    const myCell = myTeam.find(member => member.cellId === localPlayerCellId);
-    return myCell ? myCell.championId : null;
+    return this.getSelectedChampionFromSession(session);
   }
 }
 

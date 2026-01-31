@@ -4,6 +4,8 @@ class SkinSelectorUI {
         this.currentChampionId = null;
         this.currentSkins = [];
         this.selectedSkin = null;
+        this.lockedIn = false;
+        this.focusedChampionId = null;
         this.init();
     }
 
@@ -86,10 +88,13 @@ class SkinSelectorUI {
             if (data.inChampSelect) {
                 this.elements.inChampSelect.textContent = '✅ Yes';
                 this.elements.selectedChampion.textContent = data.selectedChampion || 'Loading...';
+                const isLockedIn = !!data.lockedIn;
+                const championChanged = data.selectedChampionId && this.currentChampionId !== data.selectedChampionId;
                 
                 // If champion ID changed, refresh skins
-                if (data.selectedChampionId && this.currentChampionId !== data.selectedChampionId) {
+                if (championChanged) {
                     this.currentChampionId = data.selectedChampionId;
+                    this.focusedChampionId = null;
                     this.log(`Champion selected: ID ${data.selectedChampionId}`, 'warning');
                     await this.refreshSkins();
                     
@@ -98,12 +103,26 @@ class SkinSelectorUI {
                         await this.autoSelectRandomSkin();
                     }
                 }
-                
+
+                // Focus window when player locks in and has skins
+                if (isLockedIn && !this.lockedIn) {
+                    if (this.currentSkins.length === 0) {
+                        await this.refreshSkins();
+                    }
+                    if (this.currentSkins.length > 0 && this.hasNonBaseSkins() && this.focusedChampionId !== this.currentChampionId) {
+                        this.requestWindowFocus();
+                        this.focusedChampionId = this.currentChampionId;
+                    }
+                }
+
+                this.lockedIn = isLockedIn;
                 this.currentChampionId = data.selectedChampionId;
             } else {
                 this.elements.inChampSelect.textContent = '❌ No';
                 this.elements.selectedChampion.textContent = 'None';
                 this.currentChampionId = null;
+                this.lockedIn = false;
+                this.focusedChampionId = null;
                 this.elements.skinSelectionArea.style.display = 'none';
             }
         } catch (error) {
@@ -146,6 +165,17 @@ class SkinSelectorUI {
 
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    requestWindowFocus() {
+        if (window.electronAPI && typeof window.electronAPI.requestFocus === 'function') {
+            window.electronAPI.requestFocus();
+            this.log('Window focused (locked-in with skins)', 'info');
+        }
+    }
+
+    hasNonBaseSkins() {
+        return this.currentSkins.some(skin => (skin.id % 1000) !== 0);
     }
 
     renderSkins(skins) {
