@@ -25,8 +25,12 @@
 
             <!-- Champion Select Monitor -->
             <div class="monitor-section">
-                <h2>Current Status</h2>
-                <div class="status-display">
+                <div class="section-header">
+                    <h2>Current Status</h2>
+                    <button class="collapse-btn" data-section="monitor">−</button>
+                </div>
+                <div class="section-content" id="monitor-content">
+                    <div class="status-display">
                     <div class="status-item">
                         <span class="label">In Champion Select:</span>
                         <span class="value" id="inChampSelect">❌ No</span>
@@ -40,8 +44,11 @@
 
             <!-- Skin Selection Area -->
             <div class="skin-selection-area" id="skinSelectionArea" style="display: none;">
-                <h2>Available Skins</h2>
-                
+                <div class="section-header">
+                    <h2>Available Skins</h2>
+                    <button class="collapse-btn" data-section="skins">−</button>
+                </div>
+                <div class="section-content" id="skins-content">
                 <div class="skin-grid" id="skinGrid">
                     <!-- Skins will be populated here -->
                 </div>
@@ -50,49 +57,61 @@
                     <button class="btn btn-primary" id="autoSelectBtn">🎲 Auto Select Random</button>
                     <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh</button>
                 </div>
+                </div>
             </div>
 
             <!-- Chroma Selection Area -->
             <div class="chroma-selection-area" id="chromaSelectionArea" style="display: none;">
-                <div class="chroma-header">
+                <div class="section-header">
                     <h2>Select Chroma: <span id="selectedSkinName"></span></h2>
-                    <button class="btn btn-secondary" id="backToSkinsBtn">← Back to Skins</button>
+                    <button class="collapse-btn" data-section="chroma">−</button>
                 </div>
-                
+                <div class="section-content" id="chroma-content">
                 <div class="chroma-grid" id="chromaGrid">
                     <!-- Chromas will be populated here -->
+                </div>
+                <button class="btn btn-secondary" id="backToSkinsBtn">← Back to Skins</button>
                 </div>
             </div>
 
             <!-- Mode Selection -->
             <div class="mode-section">
-                <h2>Mode</h2>
-                <div class="mode-buttons">
-                    <button class="mode-btn active" id="manualModeBtn" data-mode="manual">
-                        👆 Manual Mode
-                        <span class="mode-desc">Choose skins from the list</span>
-                    </button>
-                    <button class="mode-btn" id="autoModeBtn" data-mode="auto">
-                        🤖 Auto Mode
-                        <span class="mode-desc">Automatically select random skins</span>
-                    </button>
+                <div class="section-header">
+                    <h2>Mode</h2>
+                    <button class="collapse-btn" data-section="mode">−</button>
                 </div>
-                <div class="toggle-container">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="autoModeToggle">
-                        <span class="slider"></span>
-                    </label>
-                    <span class="toggle-label">Enable Auto Mode</span>
+                <div class="section-content" id="mode-content">
+                    <div class="mode-buttons">
+                        <button class="mode-btn active" id="manualModeBtn" data-mode="manual">
+                            👆 Manual Mode
+                            <span class="mode-desc">Choose skins from the list</span>
+                        </button>
+                        <button class="mode-btn" id="autoModeBtn" data-mode="auto">
+                            🤖 Auto Mode
+                            <span class="mode-desc">Automatically select random skins</span>
+                        </button>
+                    </div>
+                    <div class="toggle-container">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label">Enable Auto Mode</span>
+                    </div>
                 </div>
             </div>
 
             <!-- Log Area -->
             <div class="log-section">
-                <h2>Activity Log</h2>
-                <div class="log-container" id="logContainer">
-                    <p class="log-entry">Initialized. Waiting for League Client...</p>
+                <div class="section-header">
+                    <h2>Activity Log</h2>
+                    <button class="collapse-btn" data-section="log">−</button>
                 </div>
-            </div>
+                <div class="section-content" id="log-content">
+                    <div class="log-container" id="logContainer">
+                        <p class="log-entry">Initialized. Waiting for League Client...</p>
+                    </div>
+                </div>
         </div>
     </div>
 

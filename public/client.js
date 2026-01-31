@@ -413,10 +413,43 @@ class SkinSelectorUI {
         this.updateStatus();
         setInterval(() => this.updateStatus(), 2000);
     }
+
+    initCollapsibleSections() {
+        const collapseButtons = document.querySelectorAll('.collapse-btn');
+        
+        collapseButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sectionName = btn.getAttribute('data-section');
+                const contentId = `${sectionName}-content`;
+                const content = document.getElementById(contentId);
+                
+                if (content) {
+                    content.classList.toggle('collapsed');
+                    btn.textContent = content.classList.contains('collapsed') ? '+' : '−';
+                    
+                    // Save collapse state to localStorage
+                    localStorage.setItem(`section-${sectionName}-collapsed`, 
+                        content.classList.contains('collapsed'));
+                }
+            });
+
+            // Restore collapse state from localStorage
+            const sectionName = btn.getAttribute('data-section');
+            const contentId = `${sectionName}-content`;
+            const content = document.getElementById(contentId);
+            const wasCollapsed = localStorage.getItem(`section-${sectionName}-collapsed`) === 'true';
+            
+            if (content && wasCollapsed) {
+                content.classList.add('collapsed');
+                btn.textContent = '+';
+            }
+        });
+    }
 }
 
 // Initialize the UI when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     window.ui = new SkinSelectorUI();
+    window.ui.initCollapsibleSections();
     window.ui.log('Application initialized', 'success');
 });
