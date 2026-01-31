@@ -1,14 +1,47 @@
 const path = require('path');
+const fs = require('fs');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { startServer } = require('./index');
 
 let mainWindow;
 let serverInfo;
 
+const windowStateFile = path.join(app.getPath('userData'), 'windowState.json');
+
+function getWindowState() {
+  try {
+    if (fs.existsSync(windowStateFile)) {
+      return JSON.parse(fs.readFileSync(windowStateFile, 'utf-8'));
+    }
+  } catch (err) {
+    console.error('Error reading window state:', err);
+  }
+  return null;
+}
+
+function saveWindowState() {
+  if (!mainWindow) return;
+  const state = {
+    width: mainWindow.getSize()[0],
+    height: mainWindow.getSize()[1],
+    x: mainWindow.getPosition()[0],
+    y: mainWindow.getPosition()[1]
+  };
+  try {
+    fs.writeFileSync(windowStateFile, JSON.stringify(state), 'utf-8');
+  } catch (err) {
+    console.error('Error saving window state:', err);
+  }
+}
+
 function createWindow(port) {
-  mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 780,
+  const savedState = getWindowState();
+  const defaultWidth = 1100;
+  const defaultHeight = 780;
+
+  const windowConfig = {
+    width: savedState?.width ?? defaultWidth,
+    height: savedState?.height ?? defaultHeight,
     minWidth: 900,
     minHeight: 640,
     backgroundColor: '#0b0f1a',
@@ -17,9 +50,19 @@ function createWindow(port) {
       contextIsolation: true,
       nodeIntegration: false
     }
-  });
+  };
+
+  if (savedState?.x !== undefined && savedState?.y !== undefined) {
+    windowConfig.x = savedState.x;
+    windowConfig.y = savedState.y;
+  }
+
+  mainWindow = new BrowserWindow(windowConfig);
 
   mainWindow.loadURL(`http://localhost:${port}`);
+
+  mainWindow.on('resized', saveWindowState);
+  mainWindow.on('moved', saveWindowState);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -48,6 +91,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  saveWindowState();
   if (serverInfo && serverInfo.server) {
     serverInfo.server.close();
   }
