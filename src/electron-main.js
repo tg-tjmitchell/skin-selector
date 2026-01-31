@@ -76,6 +76,8 @@ ipcMain.on('focus-window', () => {
   }
   mainWindow.show();
   mainWindow.focus();
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.setAlwaysOnTop(false);
 });
 
 app.whenReady().then(async () => {

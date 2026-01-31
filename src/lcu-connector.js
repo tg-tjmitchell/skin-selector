@@ -61,7 +61,10 @@ class LCUConnector {
     const possiblePaths = [
       path.join(process.env.LOCALAPPDATA || '', 'Riot Games', 'League of Legends', 'lockfile'),
       path.join('C:', 'Riot Games', 'League of Legends', 'lockfile'),
-      path.join(process.env.ProgramFiles || '', 'Riot Games', 'League of Legends', 'lockfile')
+      path.join('D:', 'Riot Games', 'League of Legends', 'lockfile'),
+      path.join('E:', 'Riot Games', 'League of Legends', 'lockfile'),
+      path.join(process.env.ProgramFiles || '', 'Riot Games', 'League of Legends', 'lockfile'),
+      path.join(process.env['ProgramFiles(x86)'] || '', 'Riot Games', 'League of Legends', 'lockfile')
     ];
 
     for (const filePath of possiblePaths) {
