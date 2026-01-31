@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League Skin Selector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 League Skin Selector</h1>
+            <p class="subtitle">Automatically select your favorite skins in champion select</p>
+        </div>
+
+        <div class="content">
+            <!-- Status Section -->
+            <div class="status-card">
+                <div class="status-indicator" id="clientStatus"></div>
+                <div class="status-info">
+                    <p class="status-label" id="statusText">Connecting...</p>
+                    <p class="summoner-name" id="summonerName"></p>
+                </div>
+            </div>
+
+            <!-- Champion Select Monitor -->
+            <div class="monitor-section">
+                <h2>Current Status</h2>
+                <div class="status-display">
+                    <div class="status-item">
+                        <span class="label">In Champion Select:</span>
+                        <span class="value" id="inChampSelect">❌ No</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Selected Champion:</span>
+                        <span class="value" id="selectedChampion">None</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skin Selection Area -->
+            <div class="skin-selection-area" id="skinSelectionArea" style="display: none;">
+                <h2>Available Skins</h2>
+                
+                <div class="skin-grid" id="skinGrid">
+                    <!-- Skins will be populated here -->
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="autoSelectBtn">🎲 Auto Select Random</button>
+                    <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <!-- Mode Selection -->
+            <div class="mode-section">
+                <h2>Mode</h2>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" id="manualModeBtn" data-mode="manual">
+                        👆 Manual Mode
+                        <span class="mode-desc">Choose skins from the list</span>
+                    </button>
+                    <button class="mode-btn" id="autoModeBtn" data-mode="auto">
+                        🤖 Auto Mode
+                        <span class="mode-desc">Automatically select random skins</span>
+                    </button>
+                </div>
+                <div class="toggle-container">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoModeToggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-label">Enable Auto Mode</span>
+                </div>
+            </div>
+
+            <!-- Log Area -->
+            <div class="log-section">
+                <h2>Activity Log</h2>
+                <div class="log-container" id="logContainer">
+                    <p class="log-entry">Initialized. Waiting for League Client...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+</html>

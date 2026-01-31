@@ -1,0 +1,22 @@
+{
+  "name": "league-skin-selector",
+  "version": "1.0.0",
+  "description": "League of Legends skin selector using LCU API",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "keywords": [
+    "league of legends",
+    "lcu",
+    "skin selector"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "https": "^1.0.0"
+  }
+}
