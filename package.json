@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "electron": "^40.1.0",
-    "electron-builder": "^26.4.0"
+    "electron-builder": "^26.7.0"
   },
   "overrides": {
     "rimraf": "4.4.1"
