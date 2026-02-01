@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const axios = require('axios');
+const { execSync } = require('child_process');
 
 class LCUConnector {
   constructor() {
@@ -9,27 +10,26 @@ class LCUConnector {
     this.httpsAgent = null;
     this.axiosInstance = null;
     this.championMap = null; // Cache for champion ID to name mapping
+    this.lockfileWatcher = null;
+    this.lockfilePath = null;
+    this.reconnectCallback = null;
   }
 
   /**
    * Find the League Client lockfile and extract connection credentials
+   * Uses process list method (recommended by Hextech docs)
    */
-  async connect() {
+  async connect(onReconnect = null) {
     try {
-      const lockfilePath = this.findLockfile();
-      if (!lockfilePath) {
+      const credentials = this.findClientCredentials();
+      if (!credentials) {
         throw new Error('League Client is not running. Please start the client first.');
       }
 
-      const lockfileContent = fs.readFileSync(lockfilePath, 'utf8');
-      const parts = lockfileContent.split(':');
-
       this.credentials = {
-        process: parts[0],
-        pid: parts[1],
-        port: parts[2],
-        password: parts[3],
-        protocol: parts[4]
+        port: credentials.port,
+        password: credentials.token,
+        protocol: 'https'
       };
 
       // Create HTTPS agent that ignores self-signed certificate
@@ -48,6 +48,7 @@ class LCUConnector {
       });
 
       console.log('Successfully connected to League Client');
+
       return true;
     } catch (error) {
       throw new Error(`Failed to connect to League Client: ${error.message}`);
@@ -55,25 +56,68 @@ class LCUConnector {
   }
 
   /**
-   * Find the lockfile in common League of Legends installation paths
+   * Connect with retry logic - keeps trying if client not running
+   * Sets up polling to detect when client starts
    */
-  findLockfile() {
-    const possiblePaths = [
-      path.join(process.env.LOCALAPPDATA || '', 'Riot Games', 'League of Legends', 'lockfile'),
-      path.join('C:', 'Riot Games', 'League of Legends', 'lockfile'),
-      path.join('D:', 'Riot Games', 'League of Legends', 'lockfile'),
-      path.join('E:', 'Riot Games', 'League of Legends', 'lockfile'),
-      path.join(process.env.ProgramFiles || '', 'Riot Games', 'League of Legends', 'lockfile'),
-      path.join(process.env['ProgramFiles(x86)'] || '', 'Riot Games', 'League of Legends', 'lockfile')
-    ];
-
-    for (const filePath of possiblePaths) {
-      if (fs.existsSync(filePath)) {
-        return filePath;
-      }
+  async connectWithRetry(onReconnect = null) {
+    this.reconnectCallback = onReconnect;
+    
+    try {
+      await this.connect(onReconnect);
+      // Connection successful, start polling for disconnects/restarts
+      this.startPolling();
+      return true;
+    } catch (error) {
+      console.log('League Client not yet running, will retry...');
+      // Connection failed, start polling to wait for client to launch
+      this.startPollingForInitialConnection();
+      return false;
     }
+  }
 
-    return null;
+  /**
+   * Find the League Client by querying the process list
+   * Uses wmic on Windows and ps/grep on macOS to find LeagueClientUx and extract port and auth token
+   * Recommended method per Hextech docs: https://hextechdocs.dev/getting-started-with-the-lcu-api/
+   */
+  findClientCredentials() {
+    try {
+      let output;
+      
+      if (process.platform === 'win32') {
+        // Windows: use wmic
+        const command = "wmic PROCESS WHERE name='LeagueClientUx.exe' GET commandline";
+        output = execSync(command, { encoding: 'utf8' });
+      } else if (process.platform === 'darwin') {
+        // macOS: use ps and grep
+        const command = "ps -A | grep LeagueClientUx";
+        output = execSync(command, { encoding: 'utf8', shell: '/bin/bash' });
+      } else {
+        // Unsupported platform
+        return null;
+      }
+      
+      if (!output) {
+        return null;
+      }
+
+      // Extract port using regex: --app-port=([0-9]*)
+      const portMatch = output.match(/--app-port=([0-9]*)/);
+      const port = portMatch ? portMatch[1] : null;
+
+      // Extract auth token using regex: --remoting-auth-token=([\w-]*)
+      const tokenMatch = output.match(/--remoting-auth-token=([\w-]*)/);
+      const token = tokenMatch ? tokenMatch[1] : null;
+
+      if (!port || !token) {
+        return null;
+      }
+
+      return { port, token };
+    } catch (error) {
+      // Process not found or command error
+      return null;
+    }
   }
 
   /**
@@ -88,6 +132,81 @@ class LCUConnector {
         return null;
       }
       throw error;
+    }
+  }
+
+  /**
+   * Poll for client restart by checking if port/token change
+   * Auto-reconnects when credentials change (client restart)
+   */
+  startPolling() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+
+    this.pollInterval = setInterval(async () => {
+      try {
+        const newCredentials = this.findClientCredentials();
+        
+        // If no client found, stop polling
+        if (!newCredentials) {
+          console.log('Client no longer detected');
+          this.stopPolling();
+          return;
+        }
+
+        // If credentials changed, the client restarted
+        if (
+          !this.credentials ||
+          newCredentials.port !== this.credentials.port ||
+          newCredentials.token !== this.credentials.password
+        ) {
+          console.log('Client restart detected, reconnecting...');
+          await this.connect();
+          if (this.reconnectCallback) {
+            this.reconnectCallback();
+          }
+        }
+      } catch (error) {
+        console.error('Polling check failed:', error.message);
+      }
+    }, 2000); // Check every 2 seconds
+  }
+
+  /**
+   * Poll for initial client connection when app starts before League
+   */
+  startPollingForInitialConnection() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+
+    this.pollInterval = setInterval(async () => {
+      try {
+        const credentials = this.findClientCredentials();
+        
+        if (credentials) {
+          console.log('League Client detected, connecting...');
+          await this.connect();
+          if (this.reconnectCallback) {
+            this.reconnectCallback();
+          }
+          // Switch to regular polling once connected
+          this.startPolling();
+        }
+      } catch (error) {
+        console.error('Connection attempt failed:', error.message);
+      }
+    }, 2000); // Check every 2 seconds
+  }
+
+  /**
+   * Stop polling for client changes
+   */
+  stopPolling() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
   }
 

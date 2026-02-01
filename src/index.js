@@ -19,7 +19,11 @@ async function initializeLCU() {
   try {
     if (!lcu) {
       lcu = new LCUConnector();
-      await lcu.connect();
+      // Pass a reconnect callback for polling
+      await lcu.connectWithRetry(() => {
+        clientConnected = true;
+        console.log('LCU connection established/reconnected');
+      });
       clientConnected = true;
       console.log('LCU Connection established');
     }
@@ -161,7 +165,7 @@ async function startServer(options = {}) {
         console.log('League Client not detected. Please start the client and log in.\n');
       }
 
-      resolve({ port: actualPort, server, app });
+      resolve({ port: actualPort, server, app, lcu });
     });
 
     server.on('error', (error) => {

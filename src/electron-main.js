@@ -97,6 +97,10 @@ app.on('before-quit', () => {
   if (serverInfo && serverInfo.server) {
     serverInfo.server.close();
   }
+  // Clean up polling
+  if (serverInfo && serverInfo.lcu) {
+    serverInfo.lcu.stopPolling();
+  }
 });
 
 app.on('window-all-closed', () => {
