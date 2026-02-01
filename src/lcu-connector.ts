@@ -51,6 +51,13 @@ class LCUConnector {
   private pollInterval: NodeJS.Timeout | null = null;
 
   /**
+   * Check if we have an active connection to the League Client
+   */
+  isConnected(): boolean {
+    return this.axiosInstance !== null;
+  }
+
+  /**
    * Find the League Client lockfile and extract connection credentials
    * Uses process list method (recommended by Hextech docs)
    */
