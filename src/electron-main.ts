@@ -1,0 +1,107 @@
+import path from "path";
+import fs from "fs";
+import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions } from "electron";
+import { startServer, type StartServerResult } from "./index";
+
+let mainWindow: BrowserWindow | null = null;
+let serverInfo: StartServerResult | null = null;
+
+const windowStateFile = path.join(app.getPath("userData"), "windowState.json");
+
+function getWindowState(): { width: number; height: number; x: number; y: number } | null {
+  try {
+    if (fs.existsSync(windowStateFile)) {
+      return JSON.parse(fs.readFileSync(windowStateFile, "utf-8"));
+    }
+  } catch (err) {
+    console.error("Error reading window state:", err);
+  }
+  return null;
+}
+
+function saveWindowState(): void {
+  if (!mainWindow) return;
+  const [width, height] = mainWindow.getSize();
+  const [x, y] = mainWindow.getPosition();
+  const state = { width, height, x, y };
+  try {
+    fs.writeFileSync(windowStateFile, JSON.stringify(state), "utf-8");
+  } catch (err) {
+    console.error("Error saving window state:", err);
+  }
+}
+
+function createWindow(port: number): void {
+  const savedState = getWindowState();
+  const defaultWidth = 1100;
+  const defaultHeight = 780;
+
+  const windowConfig: BrowserWindowConstructorOptions = {
+    width: savedState?.width ?? defaultWidth,
+    height: savedState?.height ?? defaultHeight,
+    minWidth: 900,
+    minHeight: 640,
+    backgroundColor: "#0b0f1a",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  };
+
+  if (savedState?.x !== undefined && savedState?.y !== undefined) {
+    windowConfig.x = savedState.x;
+    windowConfig.y = savedState.y;
+  }
+
+  mainWindow = new BrowserWindow(windowConfig);
+
+  mainWindow.loadURL(`http://localhost:${port}`);
+
+  mainWindow.on("resized", saveWindowState);
+  mainWindow.on("moved", saveWindowState);
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+}
+
+ipcMain.on("focus-window", () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.setAlwaysOnTop(false);
+});
+
+app.whenReady().then(async () => {
+  const port = Number(process.env.PORT) || 3000;
+  serverInfo = await startServer({ port, isElectron: true });
+  createWindow(serverInfo.port);
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow(serverInfo?.port ?? port);
+    }
+  });
+});
+
+app.on("before-quit", () => {
+  saveWindowState();
+  if (serverInfo?.server) {
+    serverInfo.server.close();
+  }
+  // Clean up polling
+  if (serverInfo?.lcu) {
+    serverInfo.lcu.stopPolling();
+  }
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});

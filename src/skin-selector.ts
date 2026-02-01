@@ -1,7 +1,13 @@
-const readline = require('readline');
+import readline from "readline";
+import LCUConnector from "./lcu-connector";
+
+type Skin = { id: number; name: string };
 
 class SkinSelector {
-  constructor(lcuConnector) {
+  private lcu: LCUConnector;
+  private rl: readline.Interface;
+
+  constructor(lcuConnector: LCUConnector) {
     this.lcu = lcuConnector;
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -12,8 +18,8 @@ class SkinSelector {
   /**
    * Wait for user input
    */
-  question(query) {
-    return new Promise(resolve => {
+  question(query: string): Promise<string> {
+    return new Promise((resolve) => {
       this.rl.question(query, resolve);
     });
   }
@@ -21,34 +27,34 @@ class SkinSelector {
   /**
    * Display available skins for a champion
    */
-  displaySkins(skins) {
-    console.log('\n=== Available Skins ===');
+  displaySkins(skins: Skin[]): void {
+    console.log("\n=== Available Skins ===");
     skins.forEach((skin, index) => {
       console.log(`${index + 1}. ${skin.name} (ID: ${skin.id})`);
     });
-    console.log('=======================\n');
+    console.log("=======================\n");
   }
 
   /**
    * Main skin selection flow
    */
-  async selectSkin() {
+  async selectSkin(): Promise<boolean> {
     try {
-      console.log('Waiting for champion select...');
-      
+      console.log("Waiting for champion select...");
+
       // Wait for champion select
       while (!(await this.lcu.isInChampSelect())) {
         await this.sleep(1000);
       }
 
-      console.log('Champion select detected!');
+      console.log("Champion select detected!");
       await this.sleep(2000); // Wait a bit for champion to be locked
 
       // Get the selected champion
       const championId = await this.lcu.getSelectedChampion();
-      
+
       if (!championId || championId === 0) {
-        console.log('No champion selected yet. Please select a champion first.');
+        console.log("No champion selected yet. Please select a champion first.");
         return false;
       }
 
@@ -56,37 +62,44 @@ class SkinSelector {
 
       // Get available skins
       const skins = await this.lcu.getChampionSkins(championId);
-      
+
       if (skins.length === 0) {
-        console.log('No skins available for this champion.');
+        console.log("No skins available for this champion.");
         return false;
       }
 
       this.displaySkins(skins);
 
       // Ask user to select a skin
-      const answer = await this.question('Enter the number of the skin you want to select (or 0 to skip): ');
-      const selection = parseInt(answer);
+      const answer = await this.question(
+        "Enter the number of the skin you want to select (or 0 to skip): "
+      );
+      const selection = Number.parseInt(answer, 10);
 
       if (selection === 0) {
-        console.log('Skin selection skipped.');
+        console.log("Skin selection skipped.");
         return false;
       }
 
       if (selection < 1 || selection > skins.length) {
-        console.log('Invalid selection.');
+        console.log("Invalid selection.");
         return false;
       }
 
       const selectedSkin = skins[selection - 1];
-      
+      if (!selectedSkin) {
+        console.log("Invalid selection.");
+        return false;
+      }
+
       // Select the skin
       await this.lcu.selectSkin(championId, selectedSkin.id);
       console.log(`Successfully selected: ${selectedSkin.name}`);
-      
+
       return true;
     } catch (error) {
-      console.error('Error during skin selection:', error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Error during skin selection:", message);
       return false;
     }
   }
@@ -94,29 +107,29 @@ class SkinSelector {
   /**
    * Auto skin selection mode - automatically selects a random skin
    */
-  async autoSelectRandomSkin() {
+  async autoSelectRandomSkin(): Promise<boolean> {
     try {
-      console.log('Auto mode: Waiting for champion select...');
-      
+      console.log("Auto mode: Waiting for champion select...");
+
       // Wait for champion select
       while (!(await this.lcu.isInChampSelect())) {
         await this.sleep(1000);
       }
 
-      console.log('Champion select detected!');
+      console.log("Champion select detected!");
       await this.sleep(2000);
 
       const championId = await this.lcu.getSelectedChampion();
-      
+
       if (!championId || championId === 0) {
-        console.log('No champion selected yet.');
+        console.log("No champion selected yet.");
         return false;
       }
 
       const skins = await this.lcu.getChampionSkins(championId);
-      
+
       if (skins.length === 0) {
-        console.log('No skins available.');
+        console.log("No skins available.");
         return false;
       }
 
@@ -124,10 +137,11 @@ class SkinSelector {
       const randomSkin = skins[Math.floor(Math.random() * skins.length)];
       await this.lcu.selectSkin(championId, randomSkin.id);
       console.log(`Auto-selected: ${randomSkin.name}`);
-      
+
       return true;
     } catch (error) {
-      console.error('Error during auto skin selection:', error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Error during auto skin selection:", message);
       return false;
     }
   }
@@ -135,10 +149,10 @@ class SkinSelector {
   /**
    * Run the skin selector in continuous mode
    */
-  async run(autoMode = false) {
-    console.log('\n=== League Skin Selector ===');
-    console.log('Monitoring for champion select...');
-    console.log('Press Ctrl+C to exit\n');
+  async run(autoMode = false): Promise<void> {
+    console.log("\n=== League Skin Selector ===");
+    console.log("Monitoring for champion select...");
+    console.log("Press Ctrl+C to exit\n");
 
     while (true) {
       try {
@@ -148,18 +162,19 @@ class SkinSelector {
           } else {
             await this.selectSkin();
           }
-          
+
           // Wait for champion select to end
           while (await this.lcu.isInChampSelect()) {
             await this.sleep(1000);
           }
-          
-          console.log('\nChampion select ended. Waiting for next game...\n');
+
+          console.log("\nChampion select ended. Waiting for next game...\n");
         }
-        
+
         await this.sleep(2000);
       } catch (error) {
-        console.error('Error:', error.message);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("Error:", message);
         await this.sleep(5000);
       }
     }
@@ -168,16 +183,16 @@ class SkinSelector {
   /**
    * Sleep utility
    */
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
    * Close the readline interface
    */
-  close() {
+  close(): void {
     this.rl.close();
   }
 }
 
-module.exports = SkinSelector;
+export default SkinSelector;
