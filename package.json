@@ -21,20 +21,21 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@hasagi/core": "^0.6.9",
     "axios": "^1.6.0",
     "express": "^4.18.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.19.7",
     "electron": "^40.1.0",
     "electron-builder": "^26.4.0",
     "eslint": "^9.17.0",
-    "@eslint/js": "^9.17.0",
     "globals": "^15.12.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.25.0",
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.13.1"
+    "typescript-eslint": "^8.25.0"
   },
   "overrides": {
     "rimraf": "4.4.1"

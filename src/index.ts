@@ -2,7 +2,7 @@ import express, { type Express, type Request, type Response } from "express";
 import path from "path";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
-import LCUConnector from "./lcu-connector";
+import LCUConnector from "./lcu-client";
 
 const app: Express = express();
 const DEFAULT_PORT = 3000;

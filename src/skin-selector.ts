@@ -1,5 +1,5 @@
 import readline from "readline";
-import LCUConnector from "./lcu-connector";
+import LCUConnector from "./lcu-client";
 
 type Skin = { id: number; name: string };
 
