@@ -22,7 +22,7 @@ class SkinSelectorUI {
             summonerName: document.getElementById('summonerName'),
             inChampSelect: document.getElementById('inChampSelect'),
             selectedChampion: document.getElementById('selectedChampion'),
-            readyCheckStatus: document.getElementById('readyCheckStatus'),
+            readyCheckPopup: document.getElementById('readyCheckPopup'),
             acceptQueueBtn: document.getElementById('acceptQueueBtn'),
             skinSelectionArea: document.getElementById('skinSelectionArea'),
             skinGrid: document.getElementById('skinGrid'),
@@ -133,20 +133,18 @@ class SkinSelectorUI {
             }
 
             const readyCheck = data.readyCheck;
-            if (this.elements.readyCheckStatus && this.elements.acceptQueueBtn) {
+            if (this.elements.readyCheckPopup && this.elements.acceptQueueBtn) {
                 if (readyCheck && readyCheck.state === 'InProgress') {
                     const playerResponse = readyCheck.playerResponse || 'None';
-                    const displayState = playerResponse === 'Accepted' ? '✅ Accepted' : '⏳ Ready Check';
-                    this.elements.readyCheckStatus.textContent = displayState;
                     if (playerResponse === 'Accepted') {
-                        this.elements.acceptQueueBtn.classList.add('hidden');
+                        this.elements.readyCheckPopup.classList.add('hidden');
                     } else {
-                        this.elements.acceptQueueBtn.classList.remove('hidden');
+                        this.elements.readyCheckPopup.classList.remove('hidden');
                         this.elements.acceptQueueBtn.disabled = false;
+                        this.requestWindowFocus();
                     }
                 } else {
-                    this.elements.readyCheckStatus.textContent = '❌ Not Active';
-                    this.elements.acceptQueueBtn.classList.add('hidden');
+                    this.elements.readyCheckPopup.classList.add('hidden');
                     this.elements.acceptQueueBtn.disabled = false;
                 }
             }

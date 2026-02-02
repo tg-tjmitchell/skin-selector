@@ -39,10 +39,13 @@
                         <span class="label">Selected Champion:</span>
                         <span class="value" id="selectedChampion">None</span>
                     </div>
-                    <div class="status-item status-item-inline">
-                        <span class="label">Ready Check:</span>
-                        <span class="value" id="readyCheckStatus">❌ Not Active</span>
-                        <button class="btn btn-primary btn-accept hidden" id="acceptQueueBtn">✅ Accept</button>
+                </div>
+
+                <!-- Ready Check Popup -->
+                <div class="ready-check-popup hidden" id="readyCheckPopup">
+                    <div class="ready-check-content">
+                        <div class="ready-check-message">🎮 Ready Check!</div>
+                        <button class="btn btn-accept-large" id="acceptQueueBtn">✅ ACCEPT</button>
                     </div>
                 </div>
             </div>
