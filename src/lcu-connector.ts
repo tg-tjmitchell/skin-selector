@@ -496,6 +496,25 @@ class LCUConnector {
     const session = await this.getChampSelectSession();
     return this.getSelectedChampionFromSession(session);
   }
+
+  /**
+   * Get current ready check state (queue pop)
+   */
+  async getReadyCheck(): Promise<any | null> {
+    return this.get("/lol-matchmaking/v1/ready-check");
+  }
+
+  /**
+   * Accept ready check (queue pop)
+   */
+  async acceptReadyCheck(): Promise<boolean> {
+    try {
+      await this.post("/lol-matchmaking/v1/ready-check/accept", {});
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to accept ready check: ${getErrorMessage(error)}`);
+    }
+  }
 }
 
 export default LCUConnector;

@@ -22,6 +22,8 @@ class SkinSelectorUI {
             summonerName: document.getElementById('summonerName'),
             inChampSelect: document.getElementById('inChampSelect'),
             selectedChampion: document.getElementById('selectedChampion'),
+            readyCheckStatus: document.getElementById('readyCheckStatus'),
+            acceptQueueBtn: document.getElementById('acceptQueueBtn'),
             skinSelectionArea: document.getElementById('skinSelectionArea'),
             skinGrid: document.getElementById('skinGrid'),
             chromaSelectionArea: document.getElementById('chromaSelectionArea'),
@@ -40,6 +42,10 @@ class SkinSelectorUI {
     setupEventListeners() {
         this.elements.autoSelectBtn.addEventListener('click', () => this.autoSelectRandomSkin());
         this.elements.refreshBtn.addEventListener('click', () => this.refreshSkins());
+
+        if (this.elements.acceptQueueBtn) {
+            this.elements.acceptQueueBtn.addEventListener('click', () => this.acceptReadyCheck());
+        }
         
         if (this.elements.backToSkinsBtn) {
             this.elements.backToSkinsBtn.addEventListener('click', () => this.showSkinSelection());
@@ -125,10 +131,49 @@ class SkinSelectorUI {
                 this.focusedChampionId = null;
                 this.elements.skinSelectionArea.style.display = 'none';
             }
+
+            const readyCheck = data.readyCheck;
+            if (this.elements.readyCheckStatus && this.elements.acceptQueueBtn) {
+                if (readyCheck && readyCheck.state === 'InProgress') {
+                    const playerResponse = readyCheck.playerResponse || 'None';
+                    const displayState = playerResponse === 'Accepted' ? '✅ Accepted' : '⏳ Ready Check';
+                    this.elements.readyCheckStatus.textContent = displayState;
+                    if (playerResponse === 'Accepted') {
+                        this.elements.acceptQueueBtn.classList.add('hidden');
+                    } else {
+                        this.elements.acceptQueueBtn.classList.remove('hidden');
+                        this.elements.acceptQueueBtn.disabled = false;
+                    }
+                } else {
+                    this.elements.readyCheckStatus.textContent = '❌ Not Active';
+                    this.elements.acceptQueueBtn.classList.add('hidden');
+                    this.elements.acceptQueueBtn.disabled = false;
+                }
+            }
         } catch (error) {
             this.log(`Status update failed: ${error.message}`, 'error');
             this.elements.clientStatus.classList.remove('connected');
             this.elements.statusText.textContent = '❌ Disconnected';
+        }
+    }
+
+    async acceptReadyCheck() {
+        if (!this.elements.acceptQueueBtn) return;
+        try {
+            this.elements.acceptQueueBtn.disabled = true;
+            const response = await fetch('/api/accept-ready-check', { method: 'POST' });
+            const result = await response.json();
+
+            if (result.error) {
+                this.log(`Failed to accept ready check: ${result.error}`, 'error');
+                this.elements.acceptQueueBtn.disabled = false;
+                return;
+            }
+
+            this.log('Ready check accepted', 'success');
+        } catch (error) {
+            this.log(`Error accepting ready check: ${error.message}`, 'error');
+            this.elements.acceptQueueBtn.disabled = false;
         }
     }
 

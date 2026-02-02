@@ -61,6 +61,7 @@ app.get("/api/status", async (_req: Request, res: Response) => {
 
     const summoner = await lcu.getCurrentSummoner();
     const session = await lcu.getChampSelectSession();
+    const readyCheck = await lcu.getReadyCheck();
     const inChampSelect = session !== null;
 
     let selectedChampion = "None";
@@ -81,7 +82,8 @@ app.get("/api/status", async (_req: Request, res: Response) => {
       inChampSelect,
       selectedChampion,
       selectedChampionId,
-      lockedIn
+      lockedIn,
+      readyCheck
     });
   } catch (error) {
     clientConnected = false;
@@ -137,6 +139,21 @@ app.post("/api/select-skin", async (req: Request, res: Response) => {
       ? `Selected skin ${skinId} with chroma ${chromaId}`
       : `Selected skin ${skinId}`;
     return res.json({ success: true, message });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.json({ error: message });
+  }
+});
+
+// Accept ready check (queue pop)
+app.post("/api/accept-ready-check", async (_req: Request, res: Response) => {
+  try {
+    if (!lcu || !lcu.isConnected()) {
+      return res.json({ error: "Not connected to League Client" });
+    }
+
+    await lcu.acceptReadyCheck();
+    return res.json({ success: true, message: "Ready check accepted" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return res.json({ error: message });

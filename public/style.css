@@ -150,6 +150,11 @@ body {
     border-radius: 6px;
 }
 
+.status-item-inline {
+    gap: 12px;
+    justify-content: flex-start;
+}
+
 .status-item .label {
     color: var(--text-secondary);
     font-weight: 600;
@@ -285,6 +290,11 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
+}
+
+.btn-accept {
+    padding: 8px 16px;
+    font-size: 0.9em;
 }
 
 /* Mode Section */
