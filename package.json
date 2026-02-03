@@ -40,12 +40,19 @@
     "electron-builder": "^26.4.0",
     "eslint": "^9.17.0",
     "globals": "^15.12.0",
+    "htmlhint": "^1.8.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.25.0"
   },
   "overrides": {
     "rimraf": "4.4.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": "eslint --fix",
+    "*.html": "htmlhint"
   },
   "build": {
     "appId": "com.league.skinselector",

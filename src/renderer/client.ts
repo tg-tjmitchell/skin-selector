@@ -1,3 +1,5 @@
+import { getErrorMessage } from '../shared/errors';
+
 interface ElectronAPI {
     requestFocus: () => void;
 }
@@ -5,10 +7,6 @@ interface ElectronAPI {
 const STATUS_POLL_INTERVAL_MS = 2000;
 const AUTO_SELECT_DELAY_MS = 500;
 const MAX_LOG_ENTRIES = 100;
-
-function getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-}
 
 interface WindowWithExtensions extends Window {
     electronAPI?: ElectronAPI;
