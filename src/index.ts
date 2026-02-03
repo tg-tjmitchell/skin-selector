@@ -40,17 +40,26 @@ async function initializeLCU(): Promise<void> {
   try {
     if (!lcu) {
       lcu = new LCUConnector();
-      // Pass a reconnect callback for polling
-      const connected = await lcu.connectWithRetry(() => {
+      // Pass a reconnect callback for automatic state updates
+      await lcu.connectWithRetry(() => {
         clientConnected = true;
         console.log("LCU connection established/reconnected");
       });
-      // Only set connected if connectWithRetry succeeded immediately
-      clientConnected = connected;
-      if (connected) {
+      
+      // Check if we're already connected (client was running)
+      if (await lcu.isConnected()) {
+        clientConnected = true;
         console.log("LCU Connection established");
       } else {
+        clientConnected = false;
         console.log("LCU Connection pending - waiting for League Client");
+      }
+    } else if (!clientConnected && lcu) {
+      // If we previously failed to connect, try again
+      // This handles the case where the client wasn't running but is now
+      if (await lcu.isConnected()) {
+        clientConnected = true;
+        console.log("LCU connection re-established");
       }
     }
   } catch (error) {
@@ -104,8 +113,8 @@ app.get("/api/status", async (_req: Request, res: Response) => {
       await initializeLCU();
     }
 
-    // Check if we have an active connection (axios instance is set up)
-    if (!lcu || !lcu.isConnected()) {
+    // Check if we have an active connection
+    if (!lcu || !(await lcu.isConnected())) {
       return res.json({
         connected: false,
         inChampSelect: false
@@ -152,7 +161,7 @@ app.get("/api/status", async (_req: Request, res: Response) => {
 // Get skins for a champion
 app.get("/api/skins/:championId", async (req: Request, res: Response) => {
   try {
-    if (!lcu || !lcu.isConnected()) {
+    if (!lcu || !(await lcu.isConnected())) {
       return res.json({ error: "Not connected to League Client" });
     }
 
@@ -173,7 +182,7 @@ app.get("/api/skins/:championId", async (req: Request, res: Response) => {
 // Select a skin
 app.post("/api/select-skin", async (req: Request, res: Response) => {
   try {
-    if (!lcu || !lcu.isConnected()) {
+    if (!lcu || !(await lcu.isConnected())) {
       return res.json({ error: "Not connected to League Client" });
     }
 
@@ -201,7 +210,7 @@ app.post("/api/select-skin", async (req: Request, res: Response) => {
 // Accept ready check (queue pop)
 app.post("/api/accept-ready-check", async (_req: Request, res: Response) => {
   try {
-    if (!lcu || !lcu.isConnected()) {
+    if (!lcu || !(await lcu.isConnected())) {
       return res.json({ error: "Not connected to League Client" });
     }
 
@@ -259,7 +268,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<Sta
       console.log("Connecting to League Client...");
       await initializeLCU();
 
-      if (lcu && lcu.isConnected()) {
+      if (lcu && (await lcu.isConnected())) {
         try {
           const summoner = await lcu.getCurrentSummoner();
           console.log(`Connected as: ${summoner.displayName}\n`);

@@ -33,6 +33,9 @@ class LCUConnector {
   private client: HasagiClient;
   private championMap: ChampionMap | null = null;
   private reconnectCallback: (() => void) | null = null;
+  private lastConnectionState: boolean = false;
+  private connectionAttemptTimer: NodeJS.Timeout | null = null;
+  private isAttemptingConnection: boolean = false;
 
   constructor() {
     this.client = new HasagiClient({
@@ -51,6 +54,13 @@ class LCUConnector {
   private setupEventHandlers(): void {
     this.client.on("connected", () => {
       console.log("Successfully connected to League Client");
+      this.lastConnectionState = true;
+      this.isAttemptingConnection = false;
+      
+      if (this.connectionAttemptTimer) {
+        clearInterval(this.connectionAttemptTimer);
+        this.connectionAttemptTimer = null;
+      }
       
       if (this.reconnectCallback) {
         this.reconnectCallback();
@@ -59,18 +69,99 @@ class LCUConnector {
 
     this.client.on("disconnected", () => {
       console.log("Disconnected from League Client");
+      this.lastConnectionState = false;
+      // Start trying to reconnect
+      this.startConnectionRetries();
     });
 
     this.client.on("connection-attempt-failed", () => {
-      // Silent - hasagi will keep retrying
+      // Connection attempt failed, will retry
+      console.log("Connection attempt failed, will retry in 2 seconds...");
     });
   }
 
   /**
-   * Check if we have an active connection to the League Client
+   * Start attempting to connect with retries
    */
-  isConnected(): boolean {
-    return this.client.isConnected;
+  private startConnectionRetries(): void {
+    if (this.isAttemptingConnection) {
+      return; // Already attempting
+    }
+
+    this.isAttemptingConnection = true;
+    const attemptConnection = async () => {
+      try {
+        console.log("Attempting to connect to League Client...");
+        await this.client.connect({
+          authenticationStrategy: "process",
+          maxConnectionAttempts: 3,
+          connectionAttemptDelay: 1000,
+          useWebSocket: true
+        });
+        // If connection succeeds, the "connected" event will be fired
+        this.isAttemptingConnection = false;
+      } catch (error) {
+        // Failed to connect, will retry after delay
+        console.log("Connection attempt failed:", getErrorMessage(error));
+      }
+    };
+
+    // Attempt connection immediately
+    attemptConnection();
+
+    // Set up periodic retry attempts every 5 seconds
+    if (this.connectionAttemptTimer) {
+      clearInterval(this.connectionAttemptTimer);
+    }
+    
+    this.connectionAttemptTimer = setInterval(() => {
+      if (!this.lastConnectionState) {
+        attemptConnection();
+      }
+    }, 5000);
+  }
+
+  /**
+   * Check if we have an active connection to the League Client
+   * Uses a combination of the client's internal state and a test request
+   */
+  async isConnected(): Promise<boolean> {
+    // First check if client claims to be connected
+    if (!this.client.isConnected) {
+      this.lastConnectionState = false;
+      return false;
+    }
+
+    // Verify connection with a lightweight test request
+    try {
+      // Use a short timeout for the test request
+      const summoner = await Promise.race([
+        this.client.request("get", "/lol-summoner/v1/current-summoner"),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Connection test timeout")), 5000)
+        )
+      ]);
+      
+      if (summoner) {
+        this.lastConnectionState = true;
+        return true;
+      }
+    } catch (error) {
+      // Connection test failed - try to reconnect
+      if (!this.isAttemptingConnection) {
+        this.startConnectionRetries();
+      }
+      this.lastConnectionState = false;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Get the last known connection state (synchronous check)
+   */
+  wasLastConnected(): boolean {
+    return this.lastConnectionState;
   }
 
   /**
@@ -95,27 +186,21 @@ class LCUConnector {
    */
   async connectWithRetry(onReconnect: (() => void) | null = null): Promise<boolean> {
     this.reconnectCallback = onReconnect;
+    this.startConnectionRetries();
     
-    try {
-      await this.client.connect({
-        authenticationStrategy: "process",
-        maxConnectionAttempts: -1, // Infinite retries
-        connectionAttemptDelay: 2000,
-        useWebSocket: true
-      });
-      return true;
-    } catch (error) {
-      console.log("League Client not yet running, will retry automatically...");
-      return false;
-    }
+    // Return immediately - connection will happen in the background
+    return this.client.isConnected;
   }
 
   /**
    * Stop the connector and cleanup
    */
   stopPolling(): void {
-    // Hasagi handles connection lifecycle automatically
-    // No manual cleanup needed
+    if (this.connectionAttemptTimer) {
+      clearInterval(this.connectionAttemptTimer);
+      this.connectionAttemptTimer = null;
+    }
+    this.isAttemptingConnection = false;
   }
 
   /**
