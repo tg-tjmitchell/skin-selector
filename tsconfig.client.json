@@ -1,10 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "module": "ES2020",
-    "outDir": "dist/renderer",
+    "module": "commonjs",
+    "outDir": "dist",
     "rootDir": "src",
     "lib": ["ES2020", "DOM"]
   },
-  "include": ["src/renderer/**/*.ts", "src/shared/**/*.ts"]
+  "include": ["src/renderer/**/*.ts"]
 }

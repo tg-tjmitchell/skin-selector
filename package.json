@@ -7,7 +7,7 @@
   "scripts": {
     "build": "npm run build:main && npm run build:renderer && npm run copy:static",
     "build:main": "tsc",
-    "build:renderer": "tsc -p tsconfig.client.json",
+    "build:renderer": "esbuild src/renderer/client.ts --bundle --outfile=dist/renderer/client.js --format=iife --platform=browser --target=es2020",
     "copy:static": "copyfiles -u 2 \"src/renderer/*.html\" \"src/renderer/*.css\" dist/renderer",
     "start": "node dist/main/index.js",
     "dev": "tsx src/main/index.ts",
@@ -38,6 +38,7 @@
     "copyfiles": "^2.4.1",
     "electron": "^40.1.0",
     "electron-builder": "^26.4.0",
+    "esbuild": "^0.27.2",
     "eslint": "^9.17.0",
     "globals": "^15.12.0",
     "htmlhint": "^1.8.0",

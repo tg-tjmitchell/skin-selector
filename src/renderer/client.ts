@@ -545,7 +545,8 @@ class SkinSelectorUI {
     }
 
     private startStatusMonitor(): void {
-        this.updateStatus();
+        // Add a small delay before the first status check to ensure server is ready
+        setTimeout(() => this.updateStatus(), 100);
         setInterval(() => this.updateStatus(), STATUS_POLL_INTERVAL_MS);
     }
 
