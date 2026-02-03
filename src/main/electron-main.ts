@@ -1,10 +1,10 @@
 import path from "path";
 import fs from "fs";
 import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions } from "electron";
-import { startServer, type StartServerResult } from "./index";
+import { startServer, type ServerState } from "./index";
 
 let mainWindow: BrowserWindow | null = null;
-let serverInfo: StartServerResult | null = null;
+let serverInfo: ServerState | null = null;
 
 const windowStateFile = path.join(app.getPath("userData"), "windowState.json");
 

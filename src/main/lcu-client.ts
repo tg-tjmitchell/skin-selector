@@ -1,6 +1,12 @@
 import axios from "axios";
 import { HasagiClient, LCUError } from "@hasagi/core";
 import type { LCUTypes } from "@hasagi/core";
+import { getErrorMessage } from "../shared/errors";
+
+const DEFAULT_RETRY_DELAY_MS = 1000;
+const CONNECTION_RETRY_INTERVAL_MS = 5000;
+const CONNECTION_TEST_TIMEOUT_MS = 5000;
+const MAX_CONNECTION_ATTEMPTS = 3;
 
 type ChampionMap = Record<string, string>;
 
@@ -25,13 +31,47 @@ type ChampionData = {
   skins?: ChampionSkin[];
 };
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+type SummonerProfile = {
+  displayName: string;
+  summonerId: number;
+};
+
+type ReadyCheckState = {
+  state: string;
+  playerResponse?: string;
+};
+
+type OwnedSkin = {
+  id: number;
+  name: string;
+  ownership: { owned: boolean };
+  chromas: Array<{
+    id: number;
+    name: string;
+    chromaPath?: string | undefined;
+    colors: string[];
+    owned: boolean;
+    imageUrl: string;
+    chromaNum: string | number;
+  }>;
+  hasOwnedChromas: boolean;
+  loadingUrl: string;
+};
+
+type DDragonChampion = {
+  key: string;
+};
+
+type DDragonChampionList = {
+  data: Record<string, DDragonChampion>;
+};
+
+type DDragonVersions = string[];
 
 class LCUConnector {
   private client: HasagiClient;
   private championMap: ChampionMap | null = null;
+  private ddragonVersion: string | null = null;
   private reconnectCallback: (() => void) | null = null;
   private lastConnectionState: boolean = false;
   private connectionAttemptTimer: NodeJS.Timeout | null = null;
@@ -40,8 +80,8 @@ class LCUConnector {
   constructor() {
     this.client = new HasagiClient({
       defaultRetryOptions: {
-        maxRetries: 3,
-        retryDelay: 1000,
+        maxRetries: MAX_CONNECTION_ATTEMPTS,
+        retryDelay: DEFAULT_RETRY_DELAY_MS,
         noRetryStatusCodes: [400, 404]
       }
     });
@@ -94,8 +134,8 @@ class LCUConnector {
         console.log("Attempting to connect to League Client...");
         await this.client.connect({
           authenticationStrategy: "process",
-          maxConnectionAttempts: 3,
-          connectionAttemptDelay: 1000,
+          maxConnectionAttempts: MAX_CONNECTION_ATTEMPTS,
+          connectionAttemptDelay: DEFAULT_RETRY_DELAY_MS,
           useWebSocket: true
         });
         // If connection succeeds, the "connected" event will be fired
@@ -118,7 +158,7 @@ class LCUConnector {
       if (!this.lastConnectionState) {
         attemptConnection();
       }
-    }, 5000);
+    }, CONNECTION_RETRY_INTERVAL_MS);
   }
 
   /**
@@ -138,7 +178,7 @@ class LCUConnector {
       const summoner = await Promise.race([
         this.client.request("get", "/lol-summoner/v1/current-summoner"),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Connection test timeout")), 5000)
+          setTimeout(() => reject(new Error("Connection test timeout")), CONNECTION_TEST_TIMEOUT_MS)
         )
       ]);
       
@@ -213,7 +253,7 @@ class LCUConnector {
   /**
    * Get current summoner information
    */
-  async getCurrentSummoner(): Promise<any> {
+  async getCurrentSummoner(): Promise<SummonerProfile> {
     return this.client.request("get", "/lol-summoner/v1/current-summoner");
   }
 
@@ -296,16 +336,17 @@ class LCUConnector {
     }
 
     try {
+      const version = await this.getLatestDdragonVersion();
       // Fetch the champion list from Data Dragon
-      const response = await axios.get(
-        "https://ddragon.leagueoflegends.com/cdn/14.1.1/data/en_US/champion.json"
+      const response = await axios.get<DDragonChampionList>(
+        `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`
       );
 
       const champions = response.data.data;
       this.championMap = {};
 
       // Create a map of champion ID to champion name (key)
-      for (const [key, champ] of Object.entries<any>(champions)) {
+      for (const [key, champ] of Object.entries(champions)) {
         this.championMap[champ.key] = key;
       }
 
@@ -313,6 +354,25 @@ class LCUConnector {
     } catch (error) {
       console.error("Failed to fetch champion map from Data Dragon:", getErrorMessage(error));
       return {};
+    }
+  }
+
+  private async getLatestDdragonVersion(): Promise<string> {
+    if (this.ddragonVersion) {
+      return this.ddragonVersion;
+    }
+
+    try {
+      const response = await axios.get<DDragonVersions>(
+        "https://ddragon.leagueoflegends.com/api/versions.json"
+      );
+      const [latest] = response.data;
+      this.ddragonVersion = latest || "latest";
+      return this.ddragonVersion;
+    } catch (error) {
+      console.error("Failed to fetch Data Dragon versions:", getErrorMessage(error));
+      this.ddragonVersion = "latest";
+      return this.ddragonVersion;
     }
   }
 
@@ -327,7 +387,7 @@ class LCUConnector {
   /**
    * Get all owned skins for a champion
    */
-  async getChampionSkins(championId: number): Promise<any[]> {
+  async getChampionSkins(championId: number): Promise<OwnedSkin[]> {
     const champion = await this.getChampion(championId);
     if (!champion || !champion.skins) {
       return [];
@@ -350,7 +410,7 @@ class LCUConnector {
             const chromaPath = chroma.chromaPath || "";
             // Extract chroma number from path if available
             const chromaMatch = chromaPath.match(/(\d+)\.(png|jpg)$/i);
-            const chromaNum = chromaMatch ? chromaMatch[1] : chroma.id;
+            const chromaNum = chromaMatch?.[1] ?? chroma.id;
 
             return {
               id: chroma.id,
@@ -458,7 +518,7 @@ class LCUConnector {
   /**
    * Get current ready check state (queue pop)
    */
-  async getReadyCheck(): Promise<any | null> {
+  async getReadyCheck(): Promise<ReadyCheckState | null> {
     try {
       return await this.client.request("get", "/lol-matchmaking/v1/ready-check");
     } catch (error) {

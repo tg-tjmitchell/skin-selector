@@ -20,7 +20,7 @@ module.exports = [
     }
   },
   {
-    files: ["src/main/**/*.ts", "src/preload/**/*.ts"],
+    files: ["src/main/**/*.ts", "src/preload/**/*.ts", "src/shared/**/*.ts"],
     languageOptions: {
       parser: tseslint.parser,
       globals: globals.node,
@@ -38,6 +38,7 @@ module.exports = [
       ...tseslint.configs.stylisticTypeChecked.rules,
       "no-undef": "off",
       "no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }]
     }
   },
@@ -60,6 +61,7 @@ module.exports = [
       ...tseslint.configs.stylisticTypeChecked.rules,
       "no-undef": "off",
       "no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }]
     }
   }

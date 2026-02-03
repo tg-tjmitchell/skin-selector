@@ -133,6 +133,16 @@ The app automatically detects:
 - The app works in both normal and ranked champion select
 - The web UI updates every 2 seconds
 
+## Best-practice checklist
+- [x] Replace `any` response types in LCU calls with typed interfaces
+- [x] Return proper HTTP status codes for API errors (4xx/5xx)
+- [x] Fetch the latest Data Dragon version dynamically instead of hardcoding
+- [x] Extract magic numbers (polling intervals, timeouts, limits) into constants
+- [x] Centralize `getErrorMessage` into a shared utility and reuse it
+- [x] Add request timeouts for renderer `fetch` calls
+- [x] Reduce global mutable state in the server module (encapsulate in a class)
+- [x] Consider a lightweight logger with environment-based verbosity
+
 ## Future Enhancements
 
 - **Skin Preview Images** - Display actual skin artwork

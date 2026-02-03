@@ -2,6 +2,14 @@ interface ElectronAPI {
     requestFocus: () => void;
 }
 
+const STATUS_POLL_INTERVAL_MS = 2000;
+const AUTO_SELECT_DELAY_MS = 500;
+const MAX_LOG_ENTRIES = 100;
+
+function getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
 interface WindowWithExtensions extends Window {
     electronAPI?: ElectronAPI;
     ui?: SkinSelectorUI;
@@ -189,7 +197,7 @@ class SkinSelectorUI {
                     await this.refreshSkins();
                     
                     if (this.autoMode) {
-                        await this.sleep(500);
+                        await this.sleep(AUTO_SELECT_DELAY_MS);
                         await this.autoSelectRandomSkin();
                     }
                 }
@@ -233,8 +241,7 @@ class SkinSelectorUI {
                 }
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.log(`Status update failed: ${errorMessage}`, 'error');
+            this.log(`Status update failed: ${getErrorMessage(error)}`, 'error');
             this.elements.clientStatus.classList.remove('connected');
             this.elements.statusText.textContent = '❌ Disconnected';
         }
@@ -255,8 +262,7 @@ class SkinSelectorUI {
 
             this.log('Ready check accepted', 'success');
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.log(`Error accepting ready check: ${errorMessage}`, 'error');
+            this.log(`Error accepting ready check: ${getErrorMessage(error)}`, 'error');
             this.elements.acceptQueueBtn.disabled = false;
         }
     }
@@ -286,8 +292,7 @@ class SkinSelectorUI {
             this.renderSkins(skins);
             this.log(`Loaded ${skins.length} skins for champion ID ${this.currentChampionId}`, 'success');
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.log(`Failed to refresh skins: ${errorMessage}`, 'error');
+            this.log(`Failed to refresh skins: ${getErrorMessage(error)}`, 'error');
         } finally {
             this.elements.refreshBtn.disabled = false;
         }
@@ -410,8 +415,7 @@ class SkinSelectorUI {
                 this.log(message, 'success');
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.log(`Error selecting skin: ${errorMessage}`, 'error');
+            this.log(`Error selecting skin: ${getErrorMessage(error)}`, 'error');
         }
     }
 
@@ -537,14 +541,14 @@ class SkinSelectorUI {
 
         // Keep only last 100 entries
         const entries = this.elements.logContainer.querySelectorAll('.log-entry');
-        if (entries.length > 100) {
+        if (entries.length > MAX_LOG_ENTRIES) {
             entries[0]?.remove();
         }
     }
 
     private startStatusMonitor(): void {
         this.updateStatus();
-        setInterval(() => this.updateStatus(), 2000);
+        setInterval(() => this.updateStatus(), STATUS_POLL_INTERVAL_MS);
     }
 
     public initCollapsibleSections(): void {
