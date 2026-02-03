@@ -146,7 +146,7 @@ class LCUConnector {
         this.lastConnectionState = true;
         return true;
       }
-    } catch (error) {
+    } catch (_error) {
       // Connection test failed - try to reconnect
       if (!this.isAttemptingConnection) {
         this.startConnectionRetries();

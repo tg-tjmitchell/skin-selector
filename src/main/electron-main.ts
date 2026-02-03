@@ -43,7 +43,7 @@ function createWindow(port: number): void {
     minHeight: 640,
     backgroundColor: "#0b0f1a",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "..", "preload", "preload.js"),
       contextIsolation: true,
       nodeIntegration: false
     }
