@@ -7,10 +7,10 @@
 
 ## 🔧 Code Quality Improvements
 
-- [ ] **Replace dynamic `require()` with ES6 imports** - `server.ts` uses `require("express")` inside methods instead of static imports
-- [ ] **Remove unused `_onReconnect` parameter** - `connect()` method in `lcu-client.ts` has unused parameter
-- [ ] **Use logger consistently** - `server.ts` mixes `console.log` and `this.logger`
-- [ ] **Add error handling for `startServer()`** - `index.ts` doesn't handle potential rejection from `void startServer()`
+- [x] **Replace dynamic `require()` with ES6 imports** - `server.ts` uses `require("express")` inside methods instead of static imports
+- [x] **Remove unused `_onReconnect` parameter** - `connect()` method in `lcu-client.ts` has unused parameter
+- [x] **Use logger consistently** - `server.ts` mixes `console.log` and `this.logger`
+- [x] **Add error handling for `startServer()`** - `index.ts` doesn't handle potential rejection from `void startServer()`
 
 ## 🚀 Feature Enhancements
 

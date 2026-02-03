@@ -1,4 +1,4 @@
-import { Express, type Request, type Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import path from "path";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
@@ -34,15 +34,15 @@ export class SkinSelectorServer {
   private logger: Logger;
 
   constructor(isDevelopment = false) {
-    this.app = require("express")();
+    this.app = express();
     this.logger = new Logger(isDevelopment);
     this.setupMiddleware();
     this.setupRoutes();
   }
 
   private setupMiddleware(): void {
-    this.app.use(require("express").json());
-    this.app.use(require("express").static(path.join(__dirname, "../renderer")));
+    this.app.use(express.json());
+    this.app.use(express.static(path.join(__dirname, "../renderer")));
   }
 
   private setupRoutes(): void {
@@ -251,27 +251,27 @@ export class SkinSelectorServer {
         const address = this.server?.address() as AddressInfo | null;
         const actualPort = address?.port ?? port;
 
-        console.log("=================================");
-        console.log("League Skin Selector - Web UI");
-        console.log("=================================\n");
-        console.log(`Server running at http://localhost:${actualPort}`);
+        this.logger.info("=================================");
+        this.logger.info("League Skin Selector - Web UI");
+        this.logger.info("=================================");
+        this.logger.info(`Server running at http://localhost:${actualPort}`);
         if (!isElectron) {
-          console.log("Open your browser and navigate to that address\n");
+          this.logger.info("Open your browser and navigate to that address\n");
         }
 
-        console.log("Connecting to League Client...");
+        this.logger.info("Connecting to League Client...");
         await this.initializeLCU();
 
         if (this.lcu && (await this.lcu.isConnected())) {
           try {
             const summoner = await this.lcu.getCurrentSummoner();
-            console.log(`Connected as: ${summoner.displayName}\n`);
+            this.logger.info(`Connected as: ${summoner.displayName}\n`);
           } catch (error) {
             const message = getErrorMessage(error);
-            console.error(`Error getting summoner info: ${message}\n`);
+            this.logger.error(`Error getting summoner info: ${message}\n`);
           }
         } else {
-          console.log("League Client not detected. Please start the client and log in.\n");
+          this.logger.info("League Client not detected. Please start the client and log in.\n");
         }
 
         if (!this.server) {

@@ -207,7 +207,7 @@ class LCUConnector {
   /**
    * Connect to the League Client
    */
-  async connect(_onReconnect: (() => void) | null = null): Promise<boolean> {
+  async connect(): Promise<boolean> {
     try {
       await this.client.connect({
         authenticationStrategy: "process",
