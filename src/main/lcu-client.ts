@@ -244,6 +244,28 @@ class LCUConnector {
   }
 
   /**
+   * Disconnect from the League Client and cleanup all resources
+   */
+  async disconnect(): Promise<void> {
+    console.log("Disconnecting from League Client...");
+    
+    // Stop all polling and reconnection attempts
+    this.stopPolling();
+    
+    // Clear the reconnect callback
+    this.reconnectCallback = null;
+    
+    // Update connection state
+    this.lastConnectionState = false;
+    
+    // Note: HasagiClient doesn't expose a disconnect method
+    // The client will disconnect automatically when the process exits
+    // We've cleaned up all our internal state and timers
+    
+    console.log("LCU disconnected successfully");
+  }
+
+  /**
    * Check if an error is a 404 from LCU
    */
   private isNotFoundError(error: unknown): boolean {

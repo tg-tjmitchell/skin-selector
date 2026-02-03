@@ -310,12 +310,36 @@ export class SkinSelectorServer {
     return this.lcu;
   }
 
-  shutdown(): void {
+  /**
+   * Gracefully shutdown the server and cleanup all resources
+   */
+  async shutdown(): Promise<void> {
+    this.logger.info("Shutting down server...");
+    
+    // Disconnect from LCU
     if (this.lcu) {
-      this.lcu.stopPolling();
+      try {
+        await this.lcu.disconnect();
+      } catch (error) {
+        this.logger.error(`Error disconnecting LCU: ${getErrorMessage(error)}`);
+      }
+      this.lcu = null;
     }
+    
+    // Close the HTTP server
     if (this.server) {
-      this.server.close();
+      return new Promise<void>((resolve) => {
+        this.server?.close((err) => {
+          if (err) {
+            this.logger.error(`Error closing server: ${getErrorMessage(err)}`);
+          } else {
+            this.logger.info("Server closed successfully");
+          }
+          this.server = undefined;
+          this.serverStarting = null;
+          resolve();
+        });
+      });
     }
   }
 }

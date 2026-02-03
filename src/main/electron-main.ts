@@ -89,14 +89,42 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", () => {
-  saveWindowState();
-  if (serverInfo?.server) {
-    serverInfo.server.close();
-  }
-  // Clean up polling
-  if (serverInfo?.lcu) {
-    serverInfo.lcu.stopPolling();
+app.on("before-quit", (event) => {
+  // Prevent immediate quit to allow cleanup
+  if (serverInfo) {
+    event.preventDefault();
+    
+    // Save window state
+    saveWindowState();
+    
+    // Perform async cleanup
+    (async () => {
+      try {
+        // Disconnect from LCU
+        if (serverInfo?.lcu) {
+          await serverInfo.lcu.disconnect();
+        }
+        
+        // Close HTTP server
+        if (serverInfo?.server) {
+          await new Promise<void>((resolve) => {
+            serverInfo!.server.close(() => {
+              console.log("Server closed");
+              resolve();
+            });
+          });
+        }
+      } catch (error) {
+        console.error("Error during shutdown:", error);
+      } finally {
+        // Clear server info and quit for real
+        serverInfo = null;
+        app.quit();
+      }
+    })();
+  } else {
+    // No cleanup needed, just save window state
+    saveWindowState();
   }
 });
 
