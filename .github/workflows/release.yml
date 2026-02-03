@@ -32,7 +32,7 @@ jobs:
         run: npx electron-builder --win --publish never
       
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-build
           path: dist/League*.exe
