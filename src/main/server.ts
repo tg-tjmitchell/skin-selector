@@ -136,10 +136,11 @@ export class SkinSelectorServer {
         }
 
         const championIdParam = req.params.championId;
-        if (!championIdParam) {
+        const championIdStr = Array.isArray(championIdParam) ? championIdParam[0] : championIdParam;
+        if (!championIdStr) {
           return this.respondError(res, 400, "Missing championId");
         }
-        const championId = Number.parseInt(championIdParam, 10);
+        const championId = Number.parseInt(championIdStr, 10);
         const skins = await this.lcu.getChampionSkins(championId);
         return res.json(skins as SkinsResponse);
       } catch (error) {

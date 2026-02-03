@@ -27,12 +27,12 @@
   "dependencies": {
     "@hasagi/core": "^0.6.9",
     "axios": "^1.6.0",
-    "express": "^4.18.2",
+    "express": "^5.0.0",
     "qrcode": "^1.5.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
     "@types/qrcode": "^1.5.6",
     "copyfiles": "^2.4.1",
