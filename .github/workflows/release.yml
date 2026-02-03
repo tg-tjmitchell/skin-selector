@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -26,9 +29,7 @@ jobs:
         run: npm run build
       
       - name: Build Electron app
-        run: npm run dist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish never
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
