@@ -1,70 +1,77 @@
 # League of Legends Skin Selector
 
-A web-based application that uses the League Client API (LCU) to automatically select skins in champion select.
+An Electron desktop app (with web access) that uses the League Client Update (LCU) API to automatically select skins in champion select.
 
 ## Features
 
-- **Web Interface** - Beautiful, responsive UI accessible in your browser
+- **Electron Desktop App** - Native Windows application with built-in browser
+- **Mobile Access** - QR code to open the UI on your phone for easy skin selection
 - **Real-time Monitoring** - Automatically detects when you enter champion select
-- **Manual Selection** - Browse and click on any owned skin to select it
-- **Auto Mode** - Automatically select random skins
+- **Skin Selection** - Browse and select any owned skin with loading screen previews
+- **Chroma Support** - Select chromas for skins that have them
+- **Auto Mode** - Automatically select a random skin when entering champion select
+- **Ready Check Accept** - Accept queue pop directly from the app
 - **Live Status** - See connection status, summoner name, and current champion select state
 - **Activity Log** - Track all actions and events
 
 ## Prerequisites
 
-- Node.js and npm installed
+- Node.js (v18+) and npm installed
 - League of Legends client installed and running
 
 ## Installation
 
-1. Install dependencies:
 ```bash
 npm install
 ```
 
 ## Usage
 
-1. **Start the League of Legends client** and log in
-2. **Run the application**:
-```bash
-npm start
-```
+### Desktop App (Recommended)
 
-3. **Open your browser** and go to `http://localhost:3000`
-4. **Enter champion select** in League of Legends
-5. **Select your skin** from the web interface or use auto mode
-
-### Electron Desktop App
-
-1. **Run the desktop app**:
 ```bash
 npm run electron
 ```
 
-2. The Electron window will open automatically.
+The Electron window will open automatically with the skin selector UI.
 
-### Build Desktop App (Windows)
+### Web Server Only
+
+```bash
+npm run build
+npm start
+```
+
+Then open `http://localhost:3000` in your browser.
+
+### Development Mode
+
+```bash
+npm run dev
+```
+
+Runs the server with hot reload using `tsx`.
+
+### Build Installer (Windows)
 
 ```bash
 npm run dist
 ```
 
-The installer will be generated in the `dist/` folder.
+The installer will be generated in the `dist/` folder (NSIS installer and portable executable).
 
-## How it works
+## How to Use
 
-### Web Interface
-- The app starts an Express.js server on `http://localhost:3000`
-- A beautiful web UI displays your connection status, available skins, and activity log
-- The frontend communicates with the backend through REST API endpoints
+1. **Start the League of Legends client** and log in
+2. **Run the app** using one of the methods above
+3. **Enter champion select** in League of Legends
+4. **Select your skin** from the grid - click a skin to select it
+5. If the skin has chromas, you'll see a chroma picker
+6. Use **Auto Mode** to randomly select a skin each game
 
-### League Client Connection
-The application connects to the League Client Update (LCU) API:
-- Reads the `lockfile` from your League installation
-- Uses the file's credentials to authenticate with the local API
-- Monitors champion select state and available skins
-- Updates skin selection through the API
+### Mobile Access
+
+Click "Show QR" to display a QR code you can scan with your phone to access the skin selector remotely (must be on the same network).
 
 ## API Endpoints
 
@@ -76,77 +83,52 @@ Returns current connection and champion select status:
   "summoner": "SummonerName",
   "inChampSelect": true,
   "selectedChampion": "Champion ID: 1",
-  "selectedChampionId": 1
+  "selectedChampionId": 1,
+  "lockedIn": false,
+  "readyCheck": { "state": "InProgress", "playerResponse": "None" }
 }
 ```
 
 ### GET `/api/skins/:championId`
-Returns list of owned skins for a champion:
-```json
-[
-  {
-    "id": 0,
-    "name": "Garen",
-    "ownership": { "owned": true }
-  },
-  {
-    "id": 1,
-    "name": "Commando Garen",
-    "ownership": { "owned": true }
-  }
-]
-```
+Returns list of owned skins for a champion with loading screen URLs and chroma data.
 
 ### POST `/api/select-skin`
-Selects a skin for the current champion:
+Selects a skin (and optionally a chroma) for the current champion:
 ```json
 {
   "championId": 1,
-  "skinId": 5
+  "skinId": 5,
+  "chromaId": 123
 }
 ```
 
-## Modes
+### POST `/api/accept-ready-check`
+Accepts the current ready check (queue pop).
 
-### Manual Mode
-- Browse available skins in a grid layout
-- Click on any skin to select it
-- Refresh button to reload the skin list
+### GET `/api/server-info`
+Returns LAN IP and port for remote access.
 
-### Auto Mode
-- Automatically selects a random skin when you enter champion select
-- Useful for fast-paced games or if you don't care which skin you use
+### GET `/api/qr-code`
+Returns a QR code image (data URL) for the server URL.
 
-## Configuration
+## Tech Stack
 
-The app automatically detects:
-- LCU port from the lockfile
-- Authentication token
-- Current summoner information
-- Available skins for your champion
-- Champion select state
+- **Electron** - Desktop application framework
+- **Express.js** - Web server for the UI and API
+- **TypeScript** - Type-safe code throughout
+- **@hasagi/core** - LCU API client library
+- **Data Dragon** - Champion and skin artwork from Riot's CDN
 
 ## Notes
 
-- The League client must be running for the app to work
+- The League client must be running for the app to connect
 - You can only select skins you own
-- The app works in both normal and ranked champion select
-- The web UI updates every 2 seconds
-
-## Best-practice checklist
-- [x] Replace `any` response types in LCU calls with typed interfaces
-- [x] Return proper HTTP status codes for API errors (4xx/5xx)
-- [x] Fetch the latest Data Dragon version dynamically instead of hardcoding
-- [x] Extract magic numbers (polling intervals, timeouts, limits) into constants
-- [x] Centralize `getErrorMessage` into a shared utility and reuse it
-- [x] Add request timeouts for renderer `fetch` calls
-- [x] Reduce global mutable state in the server module (encapsulate in a class)
-- [x] Consider a lightweight logger with environment-based verbosity
+- Works in all champion select modes (normal, ranked, ARAM, etc.)
+- The UI polls for status updates every 2 seconds
 
 ## Future Enhancements
 
-- **Skin Preview Images** - Display actual skin artwork
-- **Champion Stats** - Show win rates and statistics
-- **Custom Keybinds** - Quick select skins with keyboard shortcuts
 - **Favorites** - Save your favorite skins per champion
+- **Skin Favorites Randomizer** - Random selection from favorites only
+- **Champion Stats** - Show win rates and statistics
 
