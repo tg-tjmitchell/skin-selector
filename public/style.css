@@ -776,3 +776,67 @@ input:checked + .slider:before {
     max-height: 0;
     opacity: 0;
 }
+
+/* QR Code Styles */
+.qr-code-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.qr-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.qr-code-header h3 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.btn-toggle-qr {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s ease;
+}
+
+.btn-toggle-qr:hover {
+    background: #0892b3;
+}
+
+.qr-code-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: var(--darker-bg);
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.qr-code-container.hidden {
+    display: none;
+}
+
+#qrCanvas {
+    max-width: 300px;
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.qr-hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+}

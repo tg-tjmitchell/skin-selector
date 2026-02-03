@@ -2,6 +2,8 @@ import express, { type Express, type Request, type Response } from "express";
 import path from "path";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
+import os from "os";
+import QRCode from "qrcode";
 import LCUConnector from "./lcu-client";
 
 const app: Express = express();
@@ -11,6 +13,23 @@ let lcu: LCUConnector | null = null;
 let clientConnected = false;
 let server: Server | undefined;
 let serverStarting: Promise<StartServerResult> | null = null;
+
+// Get LAN IP address
+function getLanIp(): string {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    const iface = interfaces[name];
+    if (!iface) continue;
+    
+    for (const addr of iface) {
+      // Skip internal and non-IPv4 addresses
+      if (addr.family === "IPv4" && !addr.internal) {
+        return addr.address;
+      }
+    }
+  }
+  return "localhost";
+}
 
 // Middleware
 app.use(express.json());
@@ -42,6 +61,40 @@ async function initializeLCU(): Promise<void> {
 }
 
 // API Routes
+
+// Get server info (including LAN IP for QR code)
+app.get("/api/server-info", (_req: Request, res: Response) => {
+  const lanIp = getLanIp();
+  const port = (server?.address() as AddressInfo)?.port || DEFAULT_PORT;
+  const url = `http://${lanIp}:${port}`;
+  
+  return res.json({
+    lanIp,
+    port,
+    url
+  });
+});
+
+// Generate QR code image
+app.get("/api/qr-code", async (_req: Request, res: Response) => {
+  try {
+    const lanIp = getLanIp();
+    const port = (server?.address() as AddressInfo)?.port || DEFAULT_PORT;
+    const url = `http://${lanIp}:${port}`;
+    
+    const qrImage = await QRCode.toDataURL(url, {
+      errorCorrectionLevel: 'H',
+      type: 'image/png',
+      margin: 1,
+      width: 300
+    });
+    
+    return res.json({ qrCodeUrl: qrImage });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ error: message });
+  }
+});
 
 // Get status
 app.get("/api/status", async (_req: Request, res: Response) => {

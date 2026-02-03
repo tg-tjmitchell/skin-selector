@@ -57,6 +57,19 @@ class SkinSelectorUI {
             this.autoMode = this.elements.autoModeToggle.checked;
             this.log(this.autoMode ? 'Auto mode enabled' : 'Auto mode disabled', 'warning');
         });
+
+        // QR Code toggle
+        const toggleQrBtn = document.getElementById('toggleQrBtn');
+        const qrContainer = document.getElementById('qrContainer');
+        if (toggleQrBtn && qrContainer) {
+            toggleQrBtn.addEventListener('click', () => {
+                qrContainer.classList.toggle('hidden');
+                toggleQrBtn.textContent = qrContainer.classList.contains('hidden') ? 'Show QR' : 'Hide QR';
+                if (!qrContainer.classList.contains('hidden') && !this.qrGenerated) {
+                    this.generateQRCode();
+                }
+            });
+        }
     }
 
     setMode(mode) {
@@ -487,6 +500,37 @@ class SkinSelectorUI {
                 btn.textContent = '+';
             }
         });
+    }
+
+    generateQRCode() {
+        const canvas = document.getElementById('qrCanvas');
+        if (!canvas) return;
+
+        // Fetch the QR code image from the server
+        fetch('/api/qr-code')
+            .then(response => response.json())
+            .then(data => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        this.qrGenerated = true;
+                        this.log('QR code generated', 'success');
+                    }
+                };
+                img.onerror = () => {
+                    console.error('Error loading QR code image');
+                    this.log('Failed to load QR code', 'error');
+                };
+                img.src = data.qrCodeUrl;
+            })
+            .catch(error => {
+                console.error('Error fetching QR code:', error);
+                this.log('Failed to fetch QR code', 'error');
+            });
     }
 }
 

@@ -14,6 +14,18 @@
         </div>
 
         <div class="content">
+            <!-- QR Code Section -->
+            <div class="qr-code-card">
+                <div class="qr-code-header">
+                    <h3>Open on Phone</h3>
+                    <button class="btn-toggle-qr" id="toggleQrBtn">Show QR</button>
+                </div>
+                <div class="qr-code-container hidden" id="qrContainer">
+                    <canvas id="qrCanvas" style="max-width: 300px; width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px;"></canvas>
+                    <p class="qr-hint">Scan with your phone to access this page</p>
+                </div>
+            </div>
+
             <!-- Status Section -->
             <div class="status-card">
                 <div class="status-indicator" id="clientStatus"></div>
