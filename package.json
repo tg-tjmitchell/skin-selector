@@ -49,7 +49,7 @@
     "typescript-eslint": "^8.25.0"
   },
   "overrides": {
-    "rimraf": "4.4.1"
+    "rimraf": "6.1.2"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": "eslint --fix",
