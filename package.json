@@ -1,6 +1,6 @@
 {
   "name": "league-skin-selector",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "commonjs",
   "description": "League of Legends skin selector using LCU API",
   "main": "dist/main/electron-main.js",
