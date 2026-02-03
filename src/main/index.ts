@@ -33,7 +33,7 @@ function getLanIp(): string {
 
 // Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../public")));
+app.use(express.static(path.join(__dirname, "../renderer")));
 
 // Initialize LCU connection
 async function initializeLCU(): Promise<void> {

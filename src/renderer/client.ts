@@ -1,45 +1,116 @@
+interface ElectronAPI {
+    requestFocus: () => void;
+}
+
+interface WindowWithExtensions extends Window {
+    electronAPI?: ElectronAPI;
+    ui?: SkinSelectorUI;
+}
+
+interface DOMElements {
+    clientStatus: HTMLElement;
+    statusText: HTMLElement;
+    summonerName: HTMLElement;
+    inChampSelect: HTMLElement;
+    selectedChampion: HTMLElement;
+    readyCheckPopup: HTMLElement;
+    acceptQueueBtn: HTMLButtonElement;
+    skinSelectionArea: HTMLElement;
+    skinGrid: HTMLElement;
+    chromaSelectionArea: HTMLElement;
+    chromaGrid: HTMLElement;
+    selectedSkinName: HTMLElement;
+    backToSkinsBtn: HTMLButtonElement;
+    autoSelectBtn: HTMLButtonElement;
+    refreshBtn: HTMLButtonElement;
+    manualModeBtn: HTMLButtonElement;
+    autoModeBtn: HTMLButtonElement;
+    autoModeToggle: HTMLInputElement;
+    logContainer: HTMLElement;
+}
+
+interface Chroma {
+    id: string;
+    name: string;
+    imageUrl: string;
+}
+
+interface Skin {
+    id: number;
+    name: string;
+    loadingUrl: string;
+    hasOwnedChromas?: boolean;
+    chromas?: Chroma[];
+}
+
+interface StatusData {
+    connected: boolean;
+    summoner?: string;
+    inChampSelect?: boolean;
+    selectedChampion?: string;
+    selectedChampionId?: number;
+    lockedIn?: boolean;
+    readyCheck?: {
+        state: string;
+        playerResponse?: string;
+    };
+}
+
+type LogType = 'info' | 'success' | 'warning' | 'error';
+
 class SkinSelectorUI {
+    private autoMode: boolean = false;
+    private currentChampionId: number | null = null;
+    private currentSkins: Skin[] = [];
+    private selectedSkin: Skin | null = null;
+    private lockedIn: boolean = false;
+    private focusedChampionId: number | null = null;
+    private elements!: DOMElements;
+    private qrGenerated: boolean = false;
+
     constructor() {
-        this.autoMode = false;
-        this.currentChampionId = null;
-        this.currentSkins = [];
-        this.selectedSkin = null;
-        this.lockedIn = false;
-        this.focusedChampionId = null;
         this.init();
     }
 
-    init() {
+    private init(): void {
         this.cacheElements();
         this.setupEventListeners();
         this.startStatusMonitor();
     }
 
-    cacheElements() {
+    private cacheElements(): void {
         this.elements = {
-            clientStatus: document.getElementById('clientStatus'),
-            statusText: document.getElementById('statusText'),
-            summonerName: document.getElementById('summonerName'),
-            inChampSelect: document.getElementById('inChampSelect'),
-            selectedChampion: document.getElementById('selectedChampion'),
-            readyCheckPopup: document.getElementById('readyCheckPopup'),
-            acceptQueueBtn: document.getElementById('acceptQueueBtn'),
-            skinSelectionArea: document.getElementById('skinSelectionArea'),
-            skinGrid: document.getElementById('skinGrid'),
-            chromaSelectionArea: document.getElementById('chromaSelectionArea'),
-            chromaGrid: document.getElementById('chromaGrid'),
-            selectedSkinName: document.getElementById('selectedSkinName'),
-            backToSkinsBtn: document.getElementById('backToSkinsBtn'),
-            autoSelectBtn: document.getElementById('autoSelectBtn'),
-            refreshBtn: document.getElementById('refreshBtn'),
-            manualModeBtn: document.getElementById('manualModeBtn'),
-            autoModeBtn: document.getElementById('autoModeBtn'),
-            autoModeToggle: document.getElementById('autoModeToggle'),
-            logContainer: document.getElementById('logContainer')
+            clientStatus: this.getElement('clientStatus'),
+            statusText: this.getElement('statusText'),
+            summonerName: this.getElement('summonerName'),
+            inChampSelect: this.getElement('inChampSelect'),
+            selectedChampion: this.getElement('selectedChampion'),
+            readyCheckPopup: this.getElement('readyCheckPopup'),
+            acceptQueueBtn: this.getElement('acceptQueueBtn') as HTMLButtonElement,
+            skinSelectionArea: this.getElement('skinSelectionArea'),
+            skinGrid: this.getElement('skinGrid'),
+            chromaSelectionArea: this.getElement('chromaSelectionArea'),
+            chromaGrid: this.getElement('chromaGrid'),
+            selectedSkinName: this.getElement('selectedSkinName'),
+            backToSkinsBtn: this.getElement('backToSkinsBtn') as HTMLButtonElement,
+            autoSelectBtn: this.getElement('autoSelectBtn') as HTMLButtonElement,
+            refreshBtn: this.getElement('refreshBtn') as HTMLButtonElement,
+            manualModeBtn: this.getElement('manualModeBtn') as HTMLButtonElement,
+            autoModeBtn: this.getElement('autoModeBtn') as HTMLButtonElement,
+            autoModeToggle: this.getElement('autoModeToggle') as HTMLInputElement,
+            logContainer: this.getElement('logContainer')
         };
     }
 
-    setupEventListeners() {
+    private getElement<T extends HTMLElement>(id: string): T {
+        const element = document.getElementById(id);
+        if (!element) {
+            throw new Error(`Element with id '${id}' not found`);
+        }
+        return element as T;
+    }
+
+    private setupEventListeners(): void {
         this.elements.autoSelectBtn.addEventListener('click', () => this.autoSelectRandomSkin());
         this.elements.refreshBtn.addEventListener('click', () => this.refreshSkins());
 
@@ -72,7 +143,7 @@ class SkinSelectorUI {
         }
     }
 
-    setMode(mode) {
+    private setMode(mode: 'manual' | 'auto'): void {
         if (mode === 'manual') {
             this.autoMode = false;
             this.elements.manualModeBtn.classList.add('active');
@@ -87,10 +158,10 @@ class SkinSelectorUI {
         this.log(`Switched to ${mode} mode`, 'warning');
     }
 
-    async updateStatus() {
+    private async updateStatus(): Promise<void> {
         try {
             const response = await fetch('/api/status');
-            const data = await response.json();
+            const data: StatusData = await response.json();
 
             if (data.connected) {
                 this.elements.clientStatus.classList.add('connected');
@@ -111,7 +182,7 @@ class SkinSelectorUI {
                 const championChanged = data.selectedChampionId && this.currentChampionId !== data.selectedChampionId;
                 
                 // If champion ID changed, refresh skins
-                if (championChanged) {
+                if (championChanged && data.selectedChampionId) {
                     this.currentChampionId = data.selectedChampionId;
                     this.focusedChampionId = null;
                     this.log(`Champion selected: ID ${data.selectedChampionId}`, 'warning');
@@ -135,7 +206,7 @@ class SkinSelectorUI {
                 }
 
                 this.lockedIn = isLockedIn;
-                this.currentChampionId = data.selectedChampionId;
+                this.currentChampionId = data.selectedChampionId || null;
             } else {
                 this.elements.inChampSelect.textContent = '❌ No';
                 this.elements.selectedChampion.textContent = 'None';
@@ -162,13 +233,14 @@ class SkinSelectorUI {
                 }
             }
         } catch (error) {
-            this.log(`Status update failed: ${error.message}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.log(`Status update failed: ${errorMessage}`, 'error');
             this.elements.clientStatus.classList.remove('connected');
             this.elements.statusText.textContent = '❌ Disconnected';
         }
     }
 
-    async acceptReadyCheck() {
+    private async acceptReadyCheck(): Promise<void> {
         if (!this.elements.acceptQueueBtn) return;
         try {
             this.elements.acceptQueueBtn.disabled = true;
@@ -183,12 +255,13 @@ class SkinSelectorUI {
 
             this.log('Ready check accepted', 'success');
         } catch (error) {
-            this.log(`Error accepting ready check: ${error.message}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.log(`Error accepting ready check: ${errorMessage}`, 'error');
             this.elements.acceptQueueBtn.disabled = false;
         }
     }
 
-    async refreshSkins() {
+    private async refreshSkins(): Promise<void> {
         if (!this.currentChampionId) {
             this.log('No champion selected', 'error');
             return;
@@ -213,28 +286,30 @@ class SkinSelectorUI {
             this.renderSkins(skins);
             this.log(`Loaded ${skins.length} skins for champion ID ${this.currentChampionId}`, 'success');
         } catch (error) {
-            this.log(`Failed to refresh skins: ${error.message}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.log(`Failed to refresh skins: ${errorMessage}`, 'error');
         } finally {
             this.elements.refreshBtn.disabled = false;
         }
     }
 
-    sleep(ms) {
+    private sleep(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    requestWindowFocus() {
-        if (window.electronAPI && typeof window.electronAPI.requestFocus === 'function') {
-            window.electronAPI.requestFocus();
+    private requestWindowFocus(): void {
+        const win = window as WindowWithExtensions;
+        if (win.electronAPI && typeof win.electronAPI.requestFocus === 'function') {
+            win.electronAPI.requestFocus();
             this.log('Window focused (locked-in with skins)', 'info');
         }
     }
 
-    hasNonBaseSkins() {
+    private hasNonBaseSkins(): boolean {
         return this.currentSkins.some(skin => (skin.id % 1000) !== 0);
     }
 
-    renderSkins(skins) {
+    private renderSkins(skins: Skin[]): void {
         this.elements.skinSelectionArea.style.display = 'block';
         this.elements.skinGrid.innerHTML = '';
 
@@ -252,7 +327,7 @@ class SkinSelectorUI {
             skinCard.className = 'skin-card';
             
             // Add chroma indicator badge if skin has chromas
-            if (skin.hasOwnedChromas) {
+            if (skin.hasOwnedChromas && skin.chromas) {
                 const chromaBadge = document.createElement('div');
                 chromaBadge.className = 'chroma-badge';
                 chromaBadge.innerHTML = `<span>🎨 ${skin.chromas.length}</span>`;
@@ -305,7 +380,7 @@ class SkinSelectorUI {
         });
     }
 
-    async selectSkin(skinId, skinName, chromaId = null) {
+    private async selectSkin(skinId: number, skinName: string, chromaId: string | null = null): Promise<void> {
         if (!this.currentChampionId) {
             this.log('No champion selected', 'error');
             return;
@@ -335,11 +410,12 @@ class SkinSelectorUI {
                 this.log(message, 'success');
             }
         } catch (error) {
-            this.log(`Error selecting skin: ${error.message}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.log(`Error selecting skin: ${errorMessage}`, 'error');
         }
     }
 
-    async autoSelectRandomSkin() {
+    private async autoSelectRandomSkin(): Promise<void> {
         if (!this.currentChampionId) {
             this.log('No champion selected', 'error');
             return;
@@ -355,10 +431,11 @@ class SkinSelectorUI {
         }
 
         const randomSkin = this.currentSkins[Math.floor(Math.random() * this.currentSkins.length)];
+        if (!randomSkin) return;
         await this.selectSkin(randomSkin.id, randomSkin.name);
     }
 
-    showChromaSelection(skin) {
+    private showChromaSelection(skin: Skin): void {
         this.selectedSkin = skin;
         this.elements.skinSelectionArea.style.display = 'none';
         
@@ -374,7 +451,7 @@ class SkinSelectorUI {
         this.log(`Viewing chromas for ${skin.name}`, 'info');
     }
 
-    showSkinSelection() {
+    private showSkinSelection(): void {
         if (this.elements.chromaSelectionArea) {
             this.elements.chromaSelectionArea.style.display = 'none';
         }
@@ -382,7 +459,7 @@ class SkinSelectorUI {
         this.selectedSkin = null;
     }
 
-    renderChromas(skin) {
+    private renderChromas(skin: Skin): void {
         if (!this.elements.chromaGrid) return;
         
         this.elements.chromaGrid.innerHTML = '';
@@ -449,7 +526,7 @@ class SkinSelectorUI {
         }
     }
 
-    log(message, type = 'info') {
+    public log(message: string, type: LogType = 'info'): void {
         const entry = document.createElement('p');
         entry.className = `log-entry ${type}`;
         const timestamp = new Date().toLocaleTimeString();
@@ -461,21 +538,23 @@ class SkinSelectorUI {
         // Keep only last 100 entries
         const entries = this.elements.logContainer.querySelectorAll('.log-entry');
         if (entries.length > 100) {
-            entries[0].remove();
+            entries[0]?.remove();
         }
     }
 
-    startStatusMonitor() {
+    private startStatusMonitor(): void {
         this.updateStatus();
         setInterval(() => this.updateStatus(), 2000);
     }
 
-    initCollapsibleSections() {
-        const collapseButtons = document.querySelectorAll('.collapse-btn');
+    public initCollapsibleSections(): void {
+        const collapseButtons = document.querySelectorAll<HTMLButtonElement>('.collapse-btn');
         
         collapseButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const sectionName = btn.getAttribute('data-section');
+                if (!sectionName) return;
+                
                 const contentId = `${sectionName}-content`;
                 const content = document.getElementById(contentId);
                 
@@ -485,12 +564,14 @@ class SkinSelectorUI {
                     
                     // Save collapse state to localStorage
                     localStorage.setItem(`section-${sectionName}-collapsed`, 
-                        content.classList.contains('collapsed'));
+                        content.classList.contains('collapsed').toString());
                 }
             });
 
             // Restore collapse state from localStorage
             const sectionName = btn.getAttribute('data-section');
+            if (!sectionName) return;
+            
             const contentId = `${sectionName}-content`;
             const content = document.getElementById(contentId);
             const wasCollapsed = localStorage.getItem(`section-${sectionName}-collapsed`) === 'true';
@@ -502,8 +583,8 @@ class SkinSelectorUI {
         });
     }
 
-    generateQRCode() {
-        const canvas = document.getElementById('qrCanvas');
+    private generateQRCode(): void {
+        const canvas = document.getElementById('qrCanvas') as HTMLCanvasElement | null;
         if (!canvas) return;
 
         // Fetch the QR code image from the server
@@ -536,7 +617,8 @@ class SkinSelectorUI {
 
 // Initialize the UI when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    window.ui = new SkinSelectorUI();
-    window.ui.initCollapsibleSections();
-    window.ui.log('Application initialized', 'success');
+    const win = window as WindowWithExtensions;
+    win.ui = new SkinSelectorUI();
+    win.ui.initCollapsibleSections();
+    win.ui.log('Application initialized', 'success');
 });

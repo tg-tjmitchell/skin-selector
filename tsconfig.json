@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "rootDir": "src",
-    "outDir": "dist",
+    "rootDir": "src/main",
+    "outDir": "dist/main",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "resolveJsonModule": true,
@@ -14,8 +14,8 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "useUnknownInCatchVariables": true,
-    "lib": ["ES2020", "DOM"]
+    "lib": ["ES2020"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/main/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
