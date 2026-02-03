@@ -21,7 +21,7 @@
 
 ## 🏗️ Architecture Improvements
 
-- [ ] **Add shared TypeScript types for API** - Create shared types between client and server for API payloads
+- [x] **Add shared TypeScript types for API** - Create shared types between client and server for API payloads
 - [ ] **Add environment configuration** - Use `.env` file for configurable options (port, auto-connect delay, etc.)
 - [ ] **Improve shutdown handling** - Make `electron-main.ts` shutdown logic more robust
 

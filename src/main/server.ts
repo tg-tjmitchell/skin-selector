@@ -7,6 +7,16 @@ import QRCode from "qrcode";
 import LCUConnector from "./lcu-client";
 import { getErrorMessage } from "../shared/errors";
 import { Logger } from "../shared/logger";
+import type {
+  ServerInfoResponse,
+  QRCodeResponse,
+  StatusResponse,
+  SkinsResponse,
+  SelectSkinRequest,
+  SelectSkinResponse,
+  AcceptReadyCheckResponse,
+  ErrorResponse
+} from "../shared/api-types";
 
 const DEFAULT_PORT = 3000;
 
@@ -47,7 +57,7 @@ export class SkinSelectorServer {
 
   private setupRoutes(): void {
     // Get server info
-    this.app.get("/api/server-info", (_req: Request, res: Response) => {
+    this.app.get("/api/server-info", (_req: Request, res: Response<ServerInfoResponse>) => {
       const lanIp = this.getLanIp();
       const port = (this.server?.address() as AddressInfo)?.port || DEFAULT_PORT;
       const url = `http://${lanIp}:${port}`;
@@ -55,7 +65,7 @@ export class SkinSelectorServer {
     });
 
     // Generate QR code
-    this.app.get("/api/qr-code", async (_req: Request, res: Response) => {
+    this.app.get("/api/qr-code", async (_req: Request, res: Response<QRCodeResponse | ErrorResponse>) => {
       try {
         const lanIp = this.getLanIp();
         const port = (this.server?.address() as AddressInfo)?.port || DEFAULT_PORT;
@@ -74,7 +84,7 @@ export class SkinSelectorServer {
     });
 
     // Get status
-    this.app.get("/api/status", async (_req: Request, res: Response) => {
+    this.app.get("/api/status", async (_req: Request, res: Response<StatusResponse | ErrorResponse>) => {
       try {
         if (!this.lcu) {
           await this.initializeLCU();
@@ -101,7 +111,7 @@ export class SkinSelectorServer {
           }
         }
 
-        return res.json({
+        const response: StatusResponse = {
           connected: true,
           summoner: summoner.displayName,
           inChampSelect,
@@ -109,7 +119,8 @@ export class SkinSelectorServer {
           selectedChampionId,
           lockedIn,
           readyCheck
-        });
+        };
+        return res.json(response);
       } catch (error) {
         this.clientConnected = false;
         const message = getErrorMessage(error);
@@ -118,7 +129,7 @@ export class SkinSelectorServer {
     });
 
     // Get skins
-    this.app.get("/api/skins/:championId", async (req: Request, res: Response) => {
+    this.app.get("/api/skins/:championId", async (req: Request, res: Response<SkinsResponse | ErrorResponse>) => {
       try {
         if (!this.lcu || !(await this.lcu.isConnected())) {
           return this.respondError(res, 503, "Not connected to League Client");
@@ -130,7 +141,7 @@ export class SkinSelectorServer {
         }
         const championId = Number.parseInt(championIdParam, 10);
         const skins = await this.lcu.getChampionSkins(championId);
-        return res.json(skins);
+        return res.json(skins as SkinsResponse);
       } catch (error) {
         const message = getErrorMessage(error);
         return this.respondError(res, 500, message);
@@ -138,17 +149,13 @@ export class SkinSelectorServer {
     });
 
     // Select skin
-    this.app.post("/api/select-skin", async (req: Request, res: Response) => {
+    this.app.post("/api/select-skin", async (req: Request, res: Response<SelectSkinResponse | ErrorResponse>) => {
       try {
         if (!this.lcu || !(await this.lcu.isConnected())) {
           return this.respondError(res, 503, "Not connected to League Client");
         }
 
-        const { championId, skinId, chromaId } = req.body as {
-          championId?: number;
-          skinId?: number;
-          chromaId?: number | null;
-        };
+        const { championId, skinId, chromaId } = req.body as SelectSkinRequest;
 
         if (!championId || !skinId) {
           return this.respondError(res, 400, "Missing championId or skinId");
@@ -166,7 +173,7 @@ export class SkinSelectorServer {
     });
 
     // Accept ready check
-    this.app.post("/api/accept-ready-check", async (_req: Request, res: Response) => {
+    this.app.post("/api/accept-ready-check", async (_req: Request, res: Response<AcceptReadyCheckResponse | ErrorResponse>) => {
       try {
         if (!this.lcu || !(await this.lcu.isConnected())) {
           return this.respondError(res, 503, "Not connected to League Client");
@@ -201,7 +208,7 @@ export class SkinSelectorServer {
     return "localhost";
   }
 
-  private respondError(res: Response, status: number, message: string): Response {
+  private respondError(res: Response<ErrorResponse>, status: number, message: string): Response<ErrorResponse> {
     return res.status(status).json({ error: message });
   }
 

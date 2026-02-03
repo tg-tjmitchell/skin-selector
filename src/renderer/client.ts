@@ -1,4 +1,16 @@
 import { getErrorMessage } from '../shared/errors';
+import type {
+  ServerInfoResponse,
+  QRCodeResponse,
+  StatusResponse,
+  SkinsResponse,
+  SkinData,
+  ChromaData,
+  SelectSkinRequest,
+  SelectSkinResponse,
+  AcceptReadyCheckResponse,
+  ErrorResponse
+} from '../shared/api-types';
 
 interface ElectronAPI {
     requestFocus: () => void;
@@ -35,40 +47,13 @@ interface DOMElements {
     logContainer: HTMLElement;
 }
 
-interface Chroma {
-    id: string;
-    name: string;
-    imageUrl: string;
-}
-
-interface Skin {
-    id: number;
-    name: string;
-    loadingUrl: string;
-    hasOwnedChromas?: boolean;
-    chromas?: Chroma[];
-}
-
-interface StatusData {
-    connected: boolean;
-    summoner?: string;
-    inChampSelect?: boolean;
-    selectedChampion?: string;
-    selectedChampionId?: number;
-    lockedIn?: boolean;
-    readyCheck?: {
-        state: string;
-        playerResponse?: string;
-    };
-}
-
 type LogType = 'info' | 'success' | 'warning' | 'error';
 
 class SkinSelectorUI {
     private autoMode: boolean = false;
     private currentChampionId: number | null = null;
-    private currentSkins: Skin[] = [];
-    private selectedSkin: Skin | null = null;
+    private currentSkins: SkinData[] = [];
+    private selectedSkin: SkinData | null = null;
     private lockedIn: boolean = false;
     private focusedChampionId: number | null = null;
     private elements!: DOMElements;
@@ -167,7 +152,7 @@ class SkinSelectorUI {
     private async updateStatus(): Promise<void> {
         try {
             const response = await fetch('/api/status');
-            const data: StatusData = await response.json();
+            const data: StatusResponse = await response.json();
 
             if (data.connected) {
                 this.elements.clientStatus.classList.add('connected');
@@ -250,9 +235,9 @@ class SkinSelectorUI {
         try {
             this.elements.acceptQueueBtn.disabled = true;
             const response = await fetch('/api/accept-ready-check', { method: 'POST' });
-            const result = await response.json();
+            const result = await response.json() as AcceptReadyCheckResponse | ErrorResponse;
 
-            if (result.error) {
+            if ('error' in result) {
                 this.log(`Failed to accept ready check: ${result.error}`, 'error');
                 this.elements.acceptQueueBtn.disabled = false;
                 return;
@@ -274,18 +259,19 @@ class SkinSelectorUI {
         try {
             this.elements.refreshBtn.disabled = true;
             const response = await fetch(`/api/skins/${this.currentChampionId}`);
-            const skins = await response.json();
+            const data = await response.json() as SkinsResponse | ErrorResponse;
 
-            if (skins.error) {
-                this.log(`Error: ${skins.error}`, 'error');
+            if ('error' in data) {
+                this.log(`Error: ${data.error}`, 'error');
                 return;
             }
 
-            if (!Array.isArray(skins)) {
+            if (!Array.isArray(data)) {
                 this.log(`Error: Invalid skin data received`, 'error');
                 return;
             }
 
+            const skins: SkinData[] = data;
             this.currentSkins = skins;
             this.renderSkins(skins);
             this.log(`Loaded ${skins.length} skins for champion ID ${this.currentChampionId}`, 'success');
@@ -312,7 +298,7 @@ class SkinSelectorUI {
         return this.currentSkins.some(skin => (skin.id % 1000) !== 0);
     }
 
-    private renderSkins(skins: Skin[]): void {
+    private renderSkins(skins: SkinData[]): void {
         this.elements.skinSelectionArea.style.display = 'block';
         this.elements.skinGrid.innerHTML = '';
 
@@ -390,21 +376,23 @@ class SkinSelectorUI {
         }
 
         try {
+            const payload: SelectSkinRequest = {
+                championId: this.currentChampionId,
+                skinId: skinId,
+                chromaId: chromaId ? Number.parseInt(chromaId, 10) : undefined
+            };
+
             const response = await fetch('/api/select-skin', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    championId: this.currentChampionId,
-                    skinId: skinId,
-                    chromaId: chromaId
-                })
+                body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
+            const result = await response.json() as SelectSkinResponse | ErrorResponse;
 
-            if (result.error) {
+            if ('error' in result) {
                 this.log(`Failed to select skin: ${result.error}`, 'error');
             } else {
                 const message = chromaId 
@@ -592,8 +580,13 @@ class SkinSelectorUI {
 
         // Fetch the QR code image from the server
         fetch('/api/qr-code')
-            .then(response => response.json())
+            .then(response => response.json() as Promise<QRCodeResponse | ErrorResponse>)
             .then(data => {
+                if ('error' in data) {
+                    this.log(`Failed to get QR code: ${data.error}`, 'error');
+                    return;
+                }
+
                 const img = new Image();
                 img.onload = () => {
                     const ctx = canvas.getContext('2d');
