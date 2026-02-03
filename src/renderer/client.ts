@@ -1,6 +1,5 @@
 import { getErrorMessage } from '../shared/errors';
 import type {
-  ServerInfoResponse,
   QRCodeResponse,
   StatusResponse,
   SkinsResponse,
@@ -369,7 +368,7 @@ class SkinSelectorUI {
         });
     }
 
-    private async selectSkin(skinId: number, skinName: string, chromaId: string | null = null): Promise<void> {
+    private async selectSkin(skinId: number, skinName: string, chromaId: number | null = null): Promise<void> {
         if (!this.currentChampionId) {
             this.log('No champion selected', 'error');
             return;
@@ -379,7 +378,7 @@ class SkinSelectorUI {
             const payload: SelectSkinRequest = {
                 championId: this.currentChampionId,
                 skinId: skinId,
-                chromaId: chromaId ? Number.parseInt(chromaId, 10) : undefined
+                chromaId: chromaId ?? undefined
             };
 
             const response = await fetch('/api/select-skin', {
@@ -425,7 +424,7 @@ class SkinSelectorUI {
         await this.selectSkin(randomSkin.id, randomSkin.name);
     }
 
-    private showChromaSelection(skin: Skin): void {
+    private showChromaSelection(skin: SkinData): void {
         this.selectedSkin = skin;
         this.elements.skinSelectionArea.style.display = 'none';
         
@@ -449,7 +448,7 @@ class SkinSelectorUI {
         this.selectedSkin = null;
     }
 
-    private renderChromas(skin: Skin): void {
+    private renderChromas(skin: SkinData): void {
         if (!this.elements.chromaGrid) return;
         
         this.elements.chromaGrid.innerHTML = '';
@@ -484,7 +483,7 @@ class SkinSelectorUI {
 
         // Add chromas
         if (skin.chromas && skin.chromas.length > 0) {
-            skin.chromas.forEach(chroma => {
+            skin.chromas.forEach((chroma: ChromaData) => {
                 const chromaCard = document.createElement('div');
                 chromaCard.className = 'chroma-card';
                 
