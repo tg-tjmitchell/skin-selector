@@ -5,7 +5,7 @@ An Electron desktop app (with web access) that uses the League Client Update (LC
 ## Features
 
 - **Electron Desktop App** - Native Windows application with built-in browser
-- **Mobile Access** - QR code to open the UI on your phone for easy skin selection
+- **Mobile Access** - QR code in the Electron app to open the UI on your phone for easy skin selection
 - **Real-time Monitoring** - Automatically detects when you enter champion select
 - **Skin Selection** - Browse and select any owned skin with loading screen previews
 - **Chroma Support** - Select chromas for skins that have them
@@ -71,7 +71,7 @@ The installer will be generated in the `dist/` folder (NSIS installer and portab
 
 ### Mobile Access
 
-Click "Show QR" to display a QR code you can scan with your phone to access the skin selector remotely (must be on the same network).
+In the Electron app, click **Open on phone** (📱) in the header to display a QR code you can scan with your phone to access the skin selector remotely (must be on the same network).
 
 ## API Endpoints
 
