@@ -1,8 +1,9 @@
 import path from "path";
 import fs from "fs";
-import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions } from "electron";
+import { app, BrowserWindow, ipcMain, shell, type BrowserWindowConstructorOptions } from "electron";
 import { autoUpdater } from "electron-updater";
 import { startServer, type ServerState } from "./index";
+import { isPortableVersion, checkForPortableUpdate, openReleasesPage } from "./portable-updater";
 
 let mainWindow: BrowserWindow | null = null;
 let serverInfo: ServerState | null = null;
@@ -78,56 +79,85 @@ ipcMain.on("focus-window", () => {
   mainWindow.setAlwaysOnTop(false);
 });
 
+ipcMain.on("open-releases-page", () => {
+  openReleasesPage();
+});
+
 app.whenReady().then(async () => {
   const port = Number(process.env.PORT) || 3000;
   serverInfo = await startServer({ port, isElectron: true });
   createWindow(serverInfo.port);
 
-  // Auto-updater setup
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Check if running portable version
+  const isPortable = isPortableVersion();
+  console.log(`Running as ${isPortable ? "portable" : "installed"} version`);
   
-  autoUpdater.on("checking-for-update", () => {
-    console.log("Checking for updates...");
-    if (mainWindow) {
-      mainWindow.webContents.send("update-checking");
-    }
-  });
-  
-  autoUpdater.on("update-available", (info) => {
-    console.log("Update available:", info.version);
-    if (mainWindow) {
-      mainWindow.webContents.send("update-available", info.version);
-    }
-  });
-  
-  autoUpdater.on("update-not-available", () => {
-    console.log("No updates available");
-  });
-  
-  autoUpdater.on("download-progress", (progressObj) => {
-    const percent = Math.round(progressObj.percent);
-    console.log(`Download progress: ${percent}%`);
-    if (mainWindow) {
-      mainWindow.webContents.send("update-progress", percent);
-    }
-  });
-  
-  autoUpdater.on("update-downloaded", (info) => {
-    console.log("Update downloaded:", info.version);
-    if (mainWindow) {
-      mainWindow.webContents.send("update-downloaded", info.version);
-    }
-  });
-  
-  autoUpdater.on("error", (err) => {
-    console.error("Auto-updater error:", err);
-  });
-  
-  // Check for updates (won't throw if offline)
-  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-    console.log("Update check failed:", err.message);
-  });
+  if (isPortable) {
+    // Portable version: check GitHub releases manually
+    console.log("Portable mode: using manual update check");
+    checkForPortableUpdate()
+      .then((updateInfo) => {
+        if (updateInfo.updateAvailable && mainWindow) {
+          console.log(`Portable update available: ${updateInfo.latestVersion}`);
+          mainWindow.webContents.send("portable-update-available", {
+            currentVersion: updateInfo.currentVersion,
+            latestVersion: updateInfo.latestVersion,
+            downloadUrl: updateInfo.downloadUrl
+          });
+        } else {
+          console.log("No portable updates available");
+        }
+      })
+      .catch((err) => {
+        console.log("Portable update check failed:", err.message);
+      });
+  } else {
+    // Installed version: use electron-updater for auto-updates
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    
+    autoUpdater.on("checking-for-update", () => {
+      console.log("Checking for updates...");
+      if (mainWindow) {
+        mainWindow.webContents.send("update-checking");
+      }
+    });
+    
+    autoUpdater.on("update-available", (info) => {
+      console.log("Update available:", info.version);
+      if (mainWindow) {
+        mainWindow.webContents.send("update-available", info.version);
+      }
+    });
+    
+    autoUpdater.on("update-not-available", () => {
+      console.log("No updates available");
+    });
+    
+    autoUpdater.on("download-progress", (progressObj) => {
+      const percent = Math.round(progressObj.percent);
+      console.log(`Download progress: ${percent}%`);
+      if (mainWindow) {
+        mainWindow.webContents.send("update-progress", percent);
+      }
+    });
+    
+    autoUpdater.on("update-downloaded", (info) => {
+      console.log("Update downloaded:", info.version);
+      if (mainWindow) {
+        mainWindow.webContents.send("update-downloaded", info.version);
+      }
+    });
+    
+    autoUpdater.on("error", (err) => {
+      console.error("Auto-updater error:", err);
+    });
+    
+    // Check for updates (won't throw if offline)
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.log("Update check failed:", err.message);
+    });
+  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

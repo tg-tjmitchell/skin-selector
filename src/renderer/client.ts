@@ -11,12 +11,20 @@ import type {
   ErrorResponse
 } from '../shared/api-types';
 
+interface PortableUpdateInfo {
+    currentVersion: string;
+    latestVersion: string;
+    downloadUrl: string;
+}
+
 interface ElectronAPI {
     requestFocus: () => void;
+    openReleasesPage?: () => void;
     onUpdateChecking?: (callback: () => void) => void;
     onUpdateAvailable?: (callback: (version: string) => void) => void;
     onUpdateProgress?: (callback: (percent: number) => void) => void;
     onUpdateDownloaded?: (callback: (version: string) => void) => void;
+    onPortableUpdateAvailable?: (callback: (info: PortableUpdateInfo) => void) => void;
 }
 
 const STATUS_POLL_INTERVAL_MS = 2000;
@@ -641,6 +649,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (win.electronAPI.onUpdateDownloaded) {
             win.electronAPI.onUpdateDownloaded((version) => {
                 win.ui?.log(`✅ Update v${version} downloaded! Will install on restart.`, 'success');
+            });
+        }
+        if (win.electronAPI.onPortableUpdateAvailable) {
+            win.electronAPI.onPortableUpdateAvailable((info) => {
+                win.ui?.log(
+                    `🆕 Update v${info.latestVersion} available! <a href="#" onclick="window.electronAPI?.openReleasesPage(); return false;" style="color: #4fc3f7; text-decoration: underline;">Download from GitHub</a>`,
+                    'warning'
+                );
             });
         }
     }
