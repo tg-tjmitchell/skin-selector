@@ -482,16 +482,22 @@ class SkinSelectorUI {
 
         try {
             this.elements.refreshBtn.disabled = true;
+            
+            // Show skeleton loader while fetching
+            this.showSkeletonLoader(6);
+            
             const response = await fetch(`/api/skins/${this.currentChampionId}`);
             const data = await response.json() as SkinsResponse | ErrorResponse;
 
             if ('error' in data) {
                 this.log(`Error: ${data.error}`, 'error');
+                this.showToast(data.error, 'error');
                 return;
             }
 
             if (!Array.isArray(data)) {
                 this.log(`Error: Invalid skin data received`, 'error');
+                this.showToast('Invalid skin data received', 'error');
                 return;
             }
 
@@ -501,6 +507,7 @@ class SkinSelectorUI {
             this.log(`Loaded ${skins.length} skins for champion ID ${this.currentChampionId}`, 'success');
         } catch (error) {
             this.log(`Failed to refresh skins: ${getErrorMessage(error)}`, 'error');
+            this.showToast('Failed to refresh skins', 'error');
         } finally {
             this.elements.refreshBtn.disabled = false;
         }
@@ -522,9 +529,51 @@ class SkinSelectorUI {
         return this.currentSkins.some(skin => (skin.id % 1000) !== 0);
     }
 
+    private showSkeletonLoader(count: number = 6): void {
+        this.elements.skinSelectionArea.style.display = 'block';
+        this.elements.skinGrid.innerHTML = '';
+        this.elements.skinGrid.className = 'skeleton-loader';
+
+        for (let i = 0; i < count; i++) {
+            const skeletonCard = document.createElement('div');
+            skeletonCard.className = 'skeleton-card';
+            skeletonCard.innerHTML = `
+                <div class="skeleton-image"></div>
+                <div class="skeleton-info">
+                    <div class="skeleton-text"></div>
+                    <div class="skeleton-text short"></div>
+                </div>
+            `;
+            this.elements.skinGrid.appendChild(skeletonCard);
+        }
+    }
+
+    private showToast(message: string, type: 'success' | 'error' | 'warning' = 'success', duration: number = 3000): void {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️'
+        };
+        
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type]}</span>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, duration);
+    }
+
     private renderSkins(skins: SkinData[]): void {
         this.elements.skinSelectionArea.style.display = 'block';
         this.elements.skinGrid.innerHTML = '';
+        this.elements.skinGrid.className = 'skin-grid'; // Reset from skeleton-loader
         this.displayedSkinCards = [];
 
         // Filter to favorites if enabled
@@ -701,11 +750,13 @@ class SkinSelectorUI {
 
             if ('error' in result) {
                 this.log(`Failed to select skin: ${result.error}`, 'error');
+                this.showToast(`Failed to select skin: ${result.error}`, 'error');
             } else {
                 const message = chromaId 
                     ? `Selected ${skinName} with chroma` 
                     : `Selected skin: ${skinName}`;
                 this.log(message, 'success');
+                this.showToast(message, 'success');
             }
         } catch (error) {
             this.log(`Error selecting skin: ${getErrorMessage(error)}`, 'error');
@@ -742,6 +793,7 @@ class SkinSelectorUI {
         const randomSkin = skinsToPickFrom[Math.floor(Math.random() * skinsToPickFrom.length)];
         if (!randomSkin) return;
         await this.selectSkin(randomSkin.id, randomSkin.name);
+        this.showToast(`🎲 Randomly selected: ${randomSkin.name}`, 'success');
     }
 
     private showChromaSelection(skin: SkinData): void {

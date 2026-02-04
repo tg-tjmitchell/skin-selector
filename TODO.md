@@ -27,9 +27,9 @@
 
 ## 🎨 UI/UX Improvements
 
-- [ ] **Add loading states** - Show skeleton loaders while skins are being fetched
-- [ ] **Add skin selection confirmation** - Visual feedback when a skin is successfully applied
-- [ ] **Improve mobile responsiveness** - QR code feature suggests mobile access, ensure UI works well on small screens
+- [x] **Add loading states** - Show skeleton loaders while skins are being fetched
+- [x] **Add skin selection confirmation** - Visual feedback when a skin is successfully applied
+- [x] **Improve mobile responsiveness** - QR code feature suggests mobile access, ensure UI works well on small screens
 - [ ] **Add dark/light theme toggle** - User preference for UI theme
 
 ## 📦 Build & Configuration
