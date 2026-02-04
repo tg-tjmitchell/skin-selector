@@ -27,6 +27,7 @@
   "dependencies": {
     "@hasagi/core": "^0.6.9",
     "axios": "^1.6.0",
+    "electron-updater": "^6.7.3",
     "express": "^5.0.0",
     "qrcode": "^1.5.3"
   },
@@ -65,8 +66,17 @@
     "win": {
       "target": [
         "nsis",
-        "portable"
+        "zip"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "tg-tjmitchell",
+      "repo": "skin-selector"
     }
   }
 }

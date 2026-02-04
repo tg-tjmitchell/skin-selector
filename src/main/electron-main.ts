@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions } from "electron";
+import { autoUpdater } from "electron-updater";
 import { startServer, type ServerState } from "./index";
 
 let mainWindow: BrowserWindow | null = null;
@@ -81,6 +82,31 @@ app.whenReady().then(async () => {
   const port = Number(process.env.PORT) || 3000;
   serverInfo = await startServer({ port, isElectron: true });
   createWindow(serverInfo.port);
+
+  // Auto-updater setup
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  
+  autoUpdater.on("update-available", (info) => {
+    console.log("Update available:", info.version);
+  });
+  
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log("Update downloaded:", info.version);
+    // Notify user via the renderer if desired
+    if (mainWindow) {
+      mainWindow.webContents.send("update-downloaded", info.version);
+    }
+  });
+  
+  autoUpdater.on("error", (err) => {
+    console.error("Auto-updater error:", err);
+  });
+  
+  // Check for updates (won't throw if offline)
+  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+    console.log("Update check failed:", err.message);
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
