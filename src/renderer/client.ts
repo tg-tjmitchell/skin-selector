@@ -13,6 +13,10 @@ import type {
 
 interface ElectronAPI {
     requestFocus: () => void;
+    onUpdateChecking?: (callback: () => void) => void;
+    onUpdateAvailable?: (callback: (version: string) => void) => void;
+    onUpdateProgress?: (callback: (percent: number) => void) => void;
+    onUpdateDownloaded?: (callback: (version: string) => void) => void;
 }
 
 const STATUS_POLL_INTERVAL_MS = 2000;
@@ -616,4 +620,28 @@ document.addEventListener('DOMContentLoaded', () => {
     win.ui = new SkinSelectorUI();
     win.ui.initCollapsibleSections();
     win.ui.log('Application initialized', 'success');
+    
+    // Listen for update events from Electron
+    if (win.electronAPI) {
+        if (win.electronAPI.onUpdateChecking) {
+            win.electronAPI.onUpdateChecking(() => {
+                win.ui?.log('Checking for updates...', 'info');
+            });
+        }
+        if (win.electronAPI.onUpdateAvailable) {
+            win.electronAPI.onUpdateAvailable((version) => {
+                win.ui?.log(`Update available: v${version}. Downloading...`, 'warning');
+            });
+        }
+        if (win.electronAPI.onUpdateProgress) {
+            win.electronAPI.onUpdateProgress((percent) => {
+                win.ui?.log(`Downloading update: ${percent}%`, 'info');
+            });
+        }
+        if (win.electronAPI.onUpdateDownloaded) {
+            win.electronAPI.onUpdateDownloaded((version) => {
+                win.ui?.log(`✅ Update v${version} downloaded! Will install on restart.`, 'success');
+            });
+        }
+    }
 });

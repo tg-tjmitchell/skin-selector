@@ -87,13 +87,34 @@ app.whenReady().then(async () => {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   
+  autoUpdater.on("checking-for-update", () => {
+    console.log("Checking for updates...");
+    if (mainWindow) {
+      mainWindow.webContents.send("update-checking");
+    }
+  });
+  
   autoUpdater.on("update-available", (info) => {
     console.log("Update available:", info.version);
+    if (mainWindow) {
+      mainWindow.webContents.send("update-available", info.version);
+    }
+  });
+  
+  autoUpdater.on("update-not-available", () => {
+    console.log("No updates available");
+  });
+  
+  autoUpdater.on("download-progress", (progressObj) => {
+    const percent = Math.round(progressObj.percent);
+    console.log(`Download progress: ${percent}%`);
+    if (mainWindow) {
+      mainWindow.webContents.send("update-progress", percent);
+    }
   });
   
   autoUpdater.on("update-downloaded", (info) => {
     console.log("Update downloaded:", info.version);
-    // Notify user via the renderer if desired
     if (mainWindow) {
       mainWindow.webContents.send("update-downloaded", info.version);
     }
