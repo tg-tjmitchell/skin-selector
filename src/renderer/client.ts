@@ -532,7 +532,7 @@ class SkinSelectorUI {
         const entry = document.createElement('p');
         entry.className = `log-entry ${type}`;
         const timestamp = new Date().toLocaleTimeString();
-        entry.textContent = `[${timestamp}] ${message}`;
+        entry.innerHTML = `[${timestamp}] ${message}`;
         
         this.elements.logContainer.appendChild(entry);
         this.elements.logContainer.scrollTop = this.elements.logContainer.scrollHeight;
