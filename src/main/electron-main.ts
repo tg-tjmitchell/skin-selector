@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { app, BrowserWindow, ipcMain, shell, type BrowserWindowConstructorOptions } from "electron";
+import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions } from "electron";
 import { autoUpdater } from "electron-updater";
 import { startServer, type ServerState } from "./index";
 import { isPortableVersion, checkForPortableUpdate, openReleasesPage } from "./portable-updater";
@@ -81,6 +81,10 @@ ipcMain.on("focus-window", () => {
 
 ipcMain.on("open-releases-page", () => {
   openReleasesPage();
+});
+
+ipcMain.handle("get-app-version", () => {
+  return app.getVersion();
 });
 
 app.whenReady().then(async () => {

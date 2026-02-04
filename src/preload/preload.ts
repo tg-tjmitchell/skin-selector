@@ -9,6 +9,7 @@ interface PortableUpdateInfo {
 contextBridge.exposeInMainWorld("electronAPI", {
   requestFocus: () => ipcRenderer.send("focus-window"),
   openReleasesPage: () => ipcRenderer.send("open-releases-page"),
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
   onUpdateChecking: (callback: () => void) => {
     ipcRenderer.on("update-checking", callback);
   },

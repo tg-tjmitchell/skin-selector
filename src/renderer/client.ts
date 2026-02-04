@@ -20,6 +20,7 @@ interface PortableUpdateInfo {
 interface ElectronAPI {
     requestFocus: () => void;
     openReleasesPage?: () => void;
+    getAppVersion?: () => Promise<string>;
     onUpdateChecking?: (callback: () => void) => void;
     onUpdateAvailable?: (callback: (version: string) => void) => void;
     onUpdateProgress?: (callback: (percent: number) => void) => void;
@@ -628,6 +629,16 @@ document.addEventListener('DOMContentLoaded', () => {
     win.ui = new SkinSelectorUI();
     win.ui.initCollapsibleSections();
     win.ui.log('Application initialized', 'success');
+
+    if (win.electronAPI?.getAppVersion) {
+        win.electronAPI.getAppVersion()
+            .then((version) => {
+                win.ui?.log(`Version ${version}`, 'info');
+            })
+            .catch((error) => {
+                console.warn('Failed to get app version:', error);
+            });
+    }
     
     // Listen for update events from Electron
     if (win.electronAPI) {
