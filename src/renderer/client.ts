@@ -53,16 +53,14 @@ interface DOMElements {
     backToSkinsBtn: HTMLButtonElement;
     autoSelectBtn: HTMLButtonElement;
     refreshBtn: HTMLButtonElement;
-    manualModeBtn: HTMLButtonElement;
-    autoModeBtn: HTMLButtonElement;
-    autoModeToggle: HTMLInputElement;
+    autoPickToggle: HTMLInputElement;
     logContainer: HTMLElement;
 }
 
 type LogType = 'info' | 'success' | 'warning' | 'error';
 
 class SkinSelectorUI {
-    private autoMode: boolean = false;
+    private autoPickEnabled: boolean = false;
     private currentChampionId: number | null = null;
     private currentSkins: SkinData[] = [];
     private selectedSkin: SkinData | null = null;
@@ -98,9 +96,7 @@ class SkinSelectorUI {
             backToSkinsBtn: this.getElement('backToSkinsBtn') as HTMLButtonElement,
             autoSelectBtn: this.getElement('autoSelectBtn') as HTMLButtonElement,
             refreshBtn: this.getElement('refreshBtn') as HTMLButtonElement,
-            manualModeBtn: this.getElement('manualModeBtn') as HTMLButtonElement,
-            autoModeBtn: this.getElement('autoModeBtn') as HTMLButtonElement,
-            autoModeToggle: this.getElement('autoModeToggle') as HTMLInputElement,
+            autoPickToggle: this.getElement('autoPickToggle') as HTMLInputElement,
             logContainer: this.getElement('logContainer')
         };
     }
@@ -125,11 +121,9 @@ class SkinSelectorUI {
             this.elements.backToSkinsBtn.addEventListener('click', () => this.showSkinSelection());
         }
         
-        this.elements.manualModeBtn.addEventListener('click', () => this.setMode('manual'));
-        this.elements.autoModeBtn.addEventListener('click', () => this.setMode('auto'));
-        this.elements.autoModeToggle.addEventListener('change', () => {
-            this.autoMode = this.elements.autoModeToggle.checked;
-            this.log(this.autoMode ? 'Auto mode enabled' : 'Auto mode disabled', 'warning');
+        this.elements.autoPickToggle.addEventListener('change', () => {
+            this.autoPickEnabled = this.elements.autoPickToggle.checked;
+            this.log(this.autoPickEnabled ? 'Auto-pick enabled' : 'Auto-pick disabled', 'info');
         });
 
         // QR Code toggle
@@ -144,21 +138,6 @@ class SkinSelectorUI {
                 }
             });
         }
-    }
-
-    private setMode(mode: 'manual' | 'auto'): void {
-        if (mode === 'manual') {
-            this.autoMode = false;
-            this.elements.manualModeBtn.classList.add('active');
-            this.elements.autoModeBtn.classList.remove('active');
-            this.elements.autoModeToggle.checked = false;
-        } else {
-            this.autoMode = true;
-            this.elements.autoModeBtn.classList.add('active');
-            this.elements.manualModeBtn.classList.remove('active');
-            this.elements.autoModeToggle.checked = true;
-        }
-        this.log(`Switched to ${mode} mode`, 'warning');
     }
 
     private async updateStatus(): Promise<void> {
@@ -192,7 +171,7 @@ class SkinSelectorUI {
                     this.log(`Champion selected: ID ${data.selectedChampionId}`, 'warning');
                     await this.refreshSkins();
                     
-                    if (this.autoMode) {
+                    if (this.autoPickEnabled) {
                         await this.sleep(AUTO_SELECT_DELAY_MS);
                         await this.autoSelectRandomSkin();
                     }
@@ -218,6 +197,8 @@ class SkinSelectorUI {
                 this.lockedIn = false;
                 this.focusedChampionId = null;
                 this.elements.skinSelectionArea.style.display = 'none';
+                this.elements.autoPickToggle.checked = false;
+                this.autoPickEnabled = false;
             }
 
             const readyCheck = data.readyCheck;

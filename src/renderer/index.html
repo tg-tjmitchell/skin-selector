@@ -75,8 +75,15 @@
                 </div>
 
                 <div class="action-buttons">
-                    <button class="btn btn-primary" id="autoSelectBtn">🎲 Auto Select Random</button>
+                    <button class="btn btn-primary" id="autoSelectBtn">🎲 Random Skin</button>
                     <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh</button>
+                </div>
+
+                <div class="auto-pick-container">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoPickToggle">
+                        <span class="checkbox-text">Auto-pick random on champion select</span>
+                    </label>
                 </div>
                 </div>
             </div>
@@ -92,33 +99,6 @@
                     <!-- Chromas will be populated here -->
                 </div>
                 <button class="btn btn-secondary" id="backToSkinsBtn">← Back to Skins</button>
-                </div>
-            </div>
-
-            <!-- Mode Selection -->
-            <div class="mode-section">
-                <div class="section-header">
-                    <h2>Mode</h2>
-                    <button class="collapse-btn" data-section="mode">−</button>
-                </div>
-                <div class="section-content" id="mode-content">
-                    <div class="mode-buttons">
-                        <button class="mode-btn active" id="manualModeBtn" data-mode="manual">
-                            👆 Manual Mode
-                            <span class="mode-desc">Choose skins from the list</span>
-                        </button>
-                        <button class="mode-btn" id="autoModeBtn" data-mode="auto">
-                            🤖 Auto Mode
-                            <span class="mode-desc">Automatically select random skins</span>
-                        </button>
-                    </div>
-                    <div class="toggle-container">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="autoModeToggle">
-                            <span class="slider"></span>
-                        </label>
-                        <span class="toggle-label">Enable Auto Mode</span>
-                    </div>
                 </div>
             </div>
 

@@ -9,7 +9,7 @@ An Electron desktop app (with web access) that uses the League Client Update (LC
 - **Real-time Monitoring** - Automatically detects when you enter champion select
 - **Skin Selection** - Browse and select any owned skin with loading screen previews
 - **Chroma Support** - Select chromas for skins that have them
-- **Auto Mode** - Automatically select a random skin when entering champion select
+- **Random Selection** - Pick a random skin with one click, or enable auto-pick for automatic selection
 - **Ready Check Accept** - Accept queue pop directly from the app
 - **Live Status** - See connection status, summoner name, and current champion select state
 - **Activity Log** - Track all actions and events
@@ -67,7 +67,7 @@ The installer will be generated in the `dist/` folder (NSIS installer and portab
 3. **Enter champion select** in League of Legends
 4. **Select your skin** from the grid - click a skin to select it
 5. If the skin has chromas, you'll see a chroma picker
-6. Use **Auto Mode** to randomly select a skin each game
+6. Use **Random Skin** button to pick a random skin, or enable the **Auto-pick** checkbox to automatically select a random skin each game
 
 ### Mobile Access
 
