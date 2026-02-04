@@ -89,6 +89,33 @@ export interface SelectSkinResponse {
 }
 
 /**
+ * Favorites payload
+ */
+export interface FavoritesPayload {
+  favorites: Record<string, number[]>;
+}
+
+/**
+ * Favorites response
+ */
+export type FavoritesResponse = FavoritesPayload;
+
+/**
+ * Toggle favorite request
+ */
+export interface ToggleFavoriteRequest {
+  championId: number;
+  skinId: number;
+}
+
+/**
+ * Toggle favorite response
+ */
+export interface ToggleFavoriteResponse extends FavoritesPayload {
+  isFavorited: boolean;
+}
+
+/**
  * Accept ready check response
  */
 export interface AcceptReadyCheckResponse {
@@ -112,5 +139,7 @@ export const API_ENDPOINTS = {
   STATUS: "/api/status",
   SKINS: (championId: number) => `/api/skins/${championId}`,
   SELECT_SKIN: "/api/select-skin",
-  ACCEPT_READY_CHECK: "/api/accept-ready-check"
+  ACCEPT_READY_CHECK: "/api/accept-ready-check",
+  FAVORITES: "/api/favorites",
+  TOGGLE_FAVORITE: "/api/favorites/toggle"
 } as const;

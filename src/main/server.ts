@@ -3,6 +3,7 @@ import path from "path";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
 import os from "os";
+import { promises as fs } from "fs";
 import QRCode from "qrcode";
 import LCUConnector from "./lcu-client";
 import { getErrorMessage } from "../shared/errors";
@@ -15,7 +16,10 @@ import type {
   SelectSkinRequest,
   SelectSkinResponse,
   AcceptReadyCheckResponse,
-  ErrorResponse
+  ErrorResponse,
+  FavoritesResponse,
+  ToggleFavoriteRequest,
+  ToggleFavoriteResponse
 } from "../shared/api-types";
 
 const DEFAULT_PORT = 3000;
@@ -42,10 +46,13 @@ export class SkinSelectorServer {
   private clientConnected = false;
   private serverStarting: Promise<ServerState> | null = null;
   private logger: Logger;
+  private favoritesCache: Record<string, number[]> | null = null;
+  private favoritesPath: string;
 
   constructor(isDevelopment = false) {
     this.app = express();
     this.logger = new Logger(isDevelopment);
+    this.favoritesPath = this.getFavoritesPath();
     this.setupMiddleware();
     this.setupRoutes();
   }
@@ -173,6 +180,52 @@ export class SkinSelectorServer {
       }
     });
 
+    // Get favorites
+    this.app.get("/api/favorites", async (_req: Request, res: Response<FavoritesResponse | ErrorResponse>) => {
+      try {
+        const favorites = await this.loadFavorites();
+        return res.json({ favorites });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
+    // Toggle favorite
+    this.app.post("/api/favorites/toggle", async (req: Request, res: Response<ToggleFavoriteResponse | ErrorResponse>) => {
+      try {
+        const { championId, skinId } = req.body as ToggleFavoriteRequest;
+
+        if (!championId || !skinId) {
+          return this.respondError(res, 400, "Missing championId or skinId");
+        }
+
+        const favorites = await this.loadFavorites();
+        const key = String(championId);
+        const current = new Set<number>(favorites[key] || []);
+
+        let isFavorited = false;
+        if (current.has(skinId)) {
+          current.delete(skinId);
+        } else {
+          current.add(skinId);
+          isFavorited = true;
+        }
+
+        if (current.size === 0) {
+          delete favorites[key];
+        } else {
+          favorites[key] = Array.from(current);
+        }
+
+        await this.saveFavorites(favorites);
+        return res.json({ favorites, isFavorited });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
     // Accept ready check
     this.app.post("/api/accept-ready-check", async (_req: Request, res: Response<AcceptReadyCheckResponse | ErrorResponse>) => {
       try {
@@ -207,6 +260,51 @@ export class SkinSelectorServer {
       }
     }
     return "localhost";
+  }
+
+  private getFavoritesPath(): string {
+    const appDataRoot = this.getAppDataRoot();
+    return path.join(appDataRoot, "favorites.json");
+  }
+
+  private getAppDataRoot(): string {
+    const platform = os.platform();
+    if (platform === "win32") {
+      const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+      return path.join(appData, "LeagueSkinSelector");
+    }
+    if (platform === "darwin") {
+      return path.join(os.homedir(), "Library", "Application Support", "LeagueSkinSelector");
+    }
+    return path.join(os.homedir(), ".config", "league-skin-selector");
+  }
+
+  private async ensureFavoritesDir(): Promise<void> {
+    const dir = path.dirname(this.favoritesPath);
+    await fs.mkdir(dir, { recursive: true });
+  }
+
+  private async loadFavorites(): Promise<Record<string, number[]>> {
+    if (this.favoritesCache) {
+      return this.favoritesCache;
+    }
+
+    await this.ensureFavoritesDir();
+    try {
+      const raw = await fs.readFile(this.favoritesPath, "utf-8");
+      const parsed = JSON.parse(raw) as Record<string, number[]>;
+      this.favoritesCache = parsed;
+      return parsed;
+    } catch (error) {
+      this.favoritesCache = {};
+      return this.favoritesCache;
+    }
+  }
+
+  private async saveFavorites(favorites: Record<string, number[]>): Promise<void> {
+    await this.ensureFavoritesDir();
+    this.favoritesCache = favorites;
+    await fs.writeFile(this.favoritesPath, JSON.stringify(favorites, null, 2), "utf-8");
   }
 
   private respondError(res: Response<ErrorResponse>, status: number, message: string): Response<ErrorResponse> {

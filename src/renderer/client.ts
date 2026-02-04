@@ -8,7 +8,10 @@ import type {
   SelectSkinRequest,
   SelectSkinResponse,
   AcceptReadyCheckResponse,
-  ErrorResponse
+    ErrorResponse,
+    FavoritesResponse,
+    ToggleFavoriteRequest,
+    ToggleFavoriteResponse
 } from '../shared/api-types';
 
 interface PortableUpdateInfo {
@@ -64,25 +67,37 @@ interface DOMElements {
 type LogType = 'info' | 'success' | 'warning' | 'error';
 
 class FavoritesManager {
-    private static readonly STORAGE_KEY = 'skin-selector-favorites';
+    private static favorites: Map<number, Set<number>> = new Map();
+
+    private static applyFavoritesPayload(payload: Record<string, number[]>): void {
+        const map = new Map<number, Set<number>>();
+        for (const [championId, skinIds] of Object.entries(payload)) {
+            map.set(parseInt(championId, 10), new Set(skinIds));
+        }
+        this.favorites = map;
+    }
+
+    static async loadFavorites(): Promise<boolean> {
+        try {
+            const response = await fetch('/api/favorites');
+            const data = await response.json() as FavoritesResponse | ErrorResponse;
+
+            if ('error' in data) {
+                return false;
+            }
+
+            this.applyFavoritesPayload(data.favorites);
+            return true;
+        } catch {
+            return false;
+        }
+    }
 
     /**
      * Get all favorites as a map of championId -> Set of skinIds
      */
     static getFavorites(): Map<number, Set<number>> {
-        const data = localStorage.getItem(this.STORAGE_KEY);
-        if (!data) return new Map();
-        
-        try {
-            const parsed = JSON.parse(data) as Record<string, number[]>;
-            const map = new Map<number, Set<number>>();
-            for (const [championId, skinIds] of Object.entries(parsed)) {
-                map.set(parseInt(championId, 10), new Set(skinIds));
-            }
-            return map;
-        } catch {
-            return new Map();
-        }
+        return this.favorites;
     }
 
     /**
@@ -96,41 +111,40 @@ class FavoritesManager {
     /**
      * Toggle favorite status for a skin
      */
-    static toggleFavorite(championId: number, skinId: number): boolean {
-        const favorites = this.getFavorites();
-        let championFavorites = favorites.get(championId) || new Set<number>();
-        
-        if (championFavorites.has(skinId)) {
-            championFavorites.delete(skinId);
-        } else {
-            championFavorites.add(skinId);
+    static async toggleFavoriteAsync(championId: number, skinId: number): Promise<boolean> {
+        const payload: ToggleFavoriteRequest = { championId, skinId };
+        const response = await fetch('/api/favorites/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json() as ToggleFavoriteResponse | ErrorResponse;
+        if ('error' in data) {
+            throw new Error(data.error);
         }
-        
-        if (championFavorites.size === 0) {
-            favorites.delete(championId);
-        } else {
-            favorites.set(championId, championFavorites);
-        }
-        
-        this.saveFavorites(favorites);
-        return championFavorites.has(skinId);
+
+        this.applyFavoritesPayload(data.favorites);
+        return data.isFavorited;
     }
 
     /**
      * Add a skin to favorites
      */
-    static addFavorite(championId: number, skinId: number): void {
+    static async addFavorite(championId: number, skinId: number): Promise<void> {
         if (!this.isFavorited(championId, skinId)) {
-            this.toggleFavorite(championId, skinId);
+            await this.toggleFavoriteAsync(championId, skinId);
         }
     }
 
     /**
      * Remove a skin from favorites
      */
-    static removeFavorite(championId: number, skinId: number): void {
+    static async removeFavorite(championId: number, skinId: number): Promise<void> {
         if (this.isFavorited(championId, skinId)) {
-            this.toggleFavorite(championId, skinId);
+            await this.toggleFavoriteAsync(championId, skinId);
         }
     }
 
@@ -139,14 +153,6 @@ class FavoritesManager {
      */
     static getFavoriteSkinsForChampion(championId: number): Set<number> {
         return this.getFavorites().get(championId) || new Set();
-    }
-
-    private static saveFavorites(favorites: Map<number, Set<number>>): void {
-        const data: Record<string, number[]> = {};
-        for (const [championId, skinIds] of favorites.entries()) {
-            data[championId.toString()] = Array.from(skinIds);
-        }
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
     }
 }
 
@@ -169,14 +175,40 @@ class SkinSelectorUI {
 
     private init(): void {
         this.cacheElements();
+        this.hideQrForWeb();
         this.setupEventListeners();
         this.loadAutoPickState();
         this.loadFavoritesFilterState();
         this.updateAutoPickToggleState();
         this.updateFavoritesButtonState();
+        void this.loadFavorites();
         this.setupKeyboardShortcuts();
         this.setupPreviewModal();
         this.startStatusMonitor();
+    }
+
+    private isElectronApp(): boolean {
+        const win = window as WindowWithExtensions;
+        return Boolean(win.electronAPI);
+    }
+
+    private hideQrForWeb(): void {
+        if (this.isElectronApp()) return;
+        const qrCard = document.querySelector('.qr-code-card');
+        if (qrCard) {
+            qrCard.remove();
+        }
+    }
+
+    private async loadFavorites(): Promise<void> {
+        const success = await FavoritesManager.loadFavorites();
+        if (!success) {
+            this.log('Failed to load favorites from server', 'warning');
+        }
+        this.updateAutoPickToggleState();
+        if (this.currentSkins.length > 0) {
+            this.renderSkins(this.currentSkins);
+        }
     }
 
     private cacheElements(): void {
@@ -257,17 +289,19 @@ class SkinSelectorUI {
             });
         }
 
-        // QR Code toggle
-        const toggleQrBtn = document.getElementById('toggleQrBtn');
-        const qrContainer = document.getElementById('qrContainer');
-        if (toggleQrBtn && qrContainer) {
-            toggleQrBtn.addEventListener('click', () => {
-                qrContainer.classList.toggle('hidden');
-                toggleQrBtn.textContent = qrContainer.classList.contains('hidden') ? 'Show QR' : 'Hide QR';
-                if (!qrContainer.classList.contains('hidden') && !this.qrGenerated) {
-                    this.generateQRCode();
-                }
-            });
+        // QR Code toggle (Electron only)
+        if (this.isElectronApp()) {
+            const toggleQrBtn = document.getElementById('toggleQrBtn');
+            const qrContainer = document.getElementById('qrContainer');
+            if (toggleQrBtn && qrContainer) {
+                toggleQrBtn.addEventListener('click', () => {
+                    qrContainer.classList.toggle('hidden');
+                    toggleQrBtn.textContent = qrContainer.classList.contains('hidden') ? 'Show QR' : 'Hide QR';
+                    if (!qrContainer.classList.contains('hidden') && !this.qrGenerated) {
+                        this.generateQRCode();
+                    }
+                });
+            }
         }
     }
 
@@ -606,14 +640,23 @@ class SkinSelectorUI {
             const isFavorited = this.currentChampionId ? FavoritesManager.isFavorited(this.currentChampionId, skin.id) : false;
             favoriteBtn.innerHTML = isFavorited ? '⭐' : '☆';
             favoriteBtn.title = isFavorited ? 'Remove from favorites' : 'Add to favorites';
-            favoriteBtn.addEventListener('click', (e) => {
+            favoriteBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 if (this.currentChampionId) {
-                    const isNowFavorited = FavoritesManager.toggleFavorite(this.currentChampionId, skin.id);
-                    favoriteBtn.innerHTML = isNowFavorited ? '⭐' : '☆';
-                    favoriteBtn.title = isNowFavorited ? 'Remove from favorites' : 'Add to favorites';
-                    this.log(isNowFavorited ? `Added ${skin.name} to favorites` : `Removed ${skin.name} from favorites`, 'info');
-                    this.updateAutoPickToggleState();
+                    try {
+                        const isNowFavorited = await FavoritesManager.toggleFavoriteAsync(this.currentChampionId, skin.id);
+                        favoriteBtn.innerHTML = isNowFavorited ? '⭐' : '☆';
+                        favoriteBtn.title = isNowFavorited ? 'Remove from favorites' : 'Add to favorites';
+                        this.log(isNowFavorited ? `Added ${skin.name} to favorites` : `Removed ${skin.name} from favorites`, 'info');
+                        this.showToast(isNowFavorited ? `Added ${skin.name} to favorites` : `Removed ${skin.name} from favorites`, 'success');
+                        this.updateAutoPickToggleState();
+                        if (this.showFavoritesOnly && !isNowFavorited) {
+                            this.renderSkins(this.currentSkins);
+                        }
+                    } catch (error) {
+                        this.log(`Failed to update favorite: ${getErrorMessage(error)}`, 'error');
+                        this.showToast('Failed to update favorite', 'error');
+                    }
                 }
             });
             skinCard.appendChild(favoriteBtn);
