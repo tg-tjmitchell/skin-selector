@@ -167,6 +167,7 @@ class SkinSelectorUI {
             const data: StatusResponse = await response.json();
 
             if (data.connected) {
+                this.elements.clientStatus.classList.remove('warning');
                 this.elements.clientStatus.classList.add('connected');
                 this.elements.statusText.textContent = '✅ Connected to League Client';
                 this.elements.summonerName.textContent = data.summoner || 'Loading...';
