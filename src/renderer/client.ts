@@ -55,12 +55,100 @@ interface DOMElements {
     refreshBtn: HTMLButtonElement;
     autoPickToggle: HTMLInputElement;
     logContainer: HTMLElement;
+    showFavoritesBtn: HTMLButtonElement | null;
 }
 
 type LogType = 'info' | 'success' | 'warning' | 'error';
 
+class FavoritesManager {
+    private static readonly STORAGE_KEY = 'skin-selector-favorites';
+
+    /**
+     * Get all favorites as a map of championId -> Set of skinIds
+     */
+    static getFavorites(): Map<number, Set<number>> {
+        const data = localStorage.getItem(this.STORAGE_KEY);
+        if (!data) return new Map();
+        
+        try {
+            const parsed = JSON.parse(data) as Record<string, number[]>;
+            const map = new Map<number, Set<number>>();
+            for (const [championId, skinIds] of Object.entries(parsed)) {
+                map.set(parseInt(championId, 10), new Set(skinIds));
+            }
+            return map;
+        } catch {
+            return new Map();
+        }
+    }
+
+    /**
+     * Check if a skin is favorited
+     */
+    static isFavorited(championId: number, skinId: number): boolean {
+        const favorites = this.getFavorites();
+        return favorites.get(championId)?.has(skinId) || false;
+    }
+
+    /**
+     * Toggle favorite status for a skin
+     */
+    static toggleFavorite(championId: number, skinId: number): boolean {
+        const favorites = this.getFavorites();
+        let championFavorites = favorites.get(championId) || new Set<number>();
+        
+        if (championFavorites.has(skinId)) {
+            championFavorites.delete(skinId);
+        } else {
+            championFavorites.add(skinId);
+        }
+        
+        if (championFavorites.size === 0) {
+            favorites.delete(championId);
+        } else {
+            favorites.set(championId, championFavorites);
+        }
+        
+        this.saveFavorites(favorites);
+        return championFavorites.has(skinId);
+    }
+
+    /**
+     * Add a skin to favorites
+     */
+    static addFavorite(championId: number, skinId: number): void {
+        if (!this.isFavorited(championId, skinId)) {
+            this.toggleFavorite(championId, skinId);
+        }
+    }
+
+    /**
+     * Remove a skin from favorites
+     */
+    static removeFavorite(championId: number, skinId: number): void {
+        if (this.isFavorited(championId, skinId)) {
+            this.toggleFavorite(championId, skinId);
+        }
+    }
+
+    /**
+     * Get all favorited skins for a champion
+     */
+    static getFavoriteSkinsForChampion(championId: number): Set<number> {
+        return this.getFavorites().get(championId) || new Set();
+    }
+
+    private static saveFavorites(favorites: Map<number, Set<number>>): void {
+        const data: Record<string, number[]> = {};
+        for (const [championId, skinIds] of favorites.entries()) {
+            data[championId.toString()] = Array.from(skinIds);
+        }
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+    }
+}
+
 class SkinSelectorUI {
-    private autoPickEnabled: boolean = false;
+    private favoritesOnlyMode: boolean = false;
     private currentChampionId: number | null = null;
     private currentSkins: SkinData[] = [];
     private selectedSkin: SkinData | null = null;
@@ -68,6 +156,7 @@ class SkinSelectorUI {
     private focusedChampionId: number | null = null;
     private elements!: DOMElements;
     private qrGenerated: boolean = false;
+    private showFavoritesOnly: boolean = false;
 
     constructor() {
         this.init();
@@ -76,6 +165,10 @@ class SkinSelectorUI {
     private init(): void {
         this.cacheElements();
         this.setupEventListeners();
+        this.loadAutoPickState();
+        this.loadFavoritesFilterState();
+        this.updateAutoPickToggleState();
+        this.updateFavoritesButtonState();
         this.startStatusMonitor();
     }
 
@@ -97,7 +190,8 @@ class SkinSelectorUI {
             autoSelectBtn: this.getElement('autoSelectBtn') as HTMLButtonElement,
             refreshBtn: this.getElement('refreshBtn') as HTMLButtonElement,
             autoPickToggle: this.getElement('autoPickToggle') as HTMLInputElement,
-            logContainer: this.getElement('logContainer')
+            logContainer: this.getElement('logContainer'),
+            showFavoritesBtn: document.getElementById('showFavoritesBtn') as HTMLButtonElement | null
         };
     }
 
@@ -107,6 +201,21 @@ class SkinSelectorUI {
             throw new Error(`Element with id '${id}' not found`);
         }
         return element as T;
+    }
+
+    private loadAutoPickState(): void {
+        const saved = localStorage.getItem('favoritesOnlyMode');
+        if (saved === 'true') {
+            this.favoritesOnlyMode = true;
+            this.elements.autoPickToggle.checked = true;
+        }
+    }
+
+    private loadFavoritesFilterState(): void {
+        const saved = localStorage.getItem('showFavoritesOnly');
+        if (saved === 'true') {
+            this.showFavoritesOnly = true;
+        }
     }
 
     private setupEventListeners(): void {
@@ -122,9 +231,21 @@ class SkinSelectorUI {
         }
         
         this.elements.autoPickToggle.addEventListener('change', () => {
-            this.autoPickEnabled = this.elements.autoPickToggle.checked;
-            this.log(this.autoPickEnabled ? 'Auto-pick enabled' : 'Auto-pick disabled', 'info');
+            this.favoritesOnlyMode = this.elements.autoPickToggle.checked;
+            localStorage.setItem('favoritesOnlyMode', this.favoritesOnlyMode.toString());
+            this.log(this.favoritesOnlyMode ? 'Favorites-only mode enabled' : 'Favorites-only mode disabled', 'info');
         });
+
+        // Favorites filter toggle
+        if (this.elements.showFavoritesBtn) {
+            this.elements.showFavoritesBtn.addEventListener('click', () => {
+                this.showFavoritesOnly = !this.showFavoritesOnly;
+                localStorage.setItem('showFavoritesOnly', this.showFavoritesOnly.toString());
+                this.updateFavoritesButtonState();
+                this.renderSkins(this.currentSkins);
+                this.log(this.showFavoritesOnly ? 'Showing favorites only' : 'Showing all skins', 'info');
+            });
+        }
 
         // QR Code toggle
         const toggleQrBtn = document.getElementById('toggleQrBtn');
@@ -170,8 +291,9 @@ class SkinSelectorUI {
                     this.focusedChampionId = null;
                     this.log(`Champion selected: ID ${data.selectedChampionId}`, 'warning');
                     await this.refreshSkins();
+                    this.updateAutoPickToggleState();
                     
-                    if (this.autoPickEnabled) {
+                    if (this.favoritesOnlyMode) {
                         await this.sleep(AUTO_SELECT_DELAY_MS);
                         await this.autoSelectRandomSkin();
                     }
@@ -197,8 +319,7 @@ class SkinSelectorUI {
                 this.lockedIn = false;
                 this.focusedChampionId = null;
                 this.elements.skinSelectionArea.style.display = 'none';
-                this.elements.autoPickToggle.checked = false;
-                this.autoPickEnabled = false;
+                this.updateAutoPickToggleState();
             }
 
             const readyCheck = data.readyCheck;
@@ -296,18 +417,47 @@ class SkinSelectorUI {
         this.elements.skinSelectionArea.style.display = 'block';
         this.elements.skinGrid.innerHTML = '';
 
-        if (skins.length === 0) {
+        // Filter to favorites if enabled
+        let skinsToDisplay = skins;
+        if (this.showFavoritesOnly && this.currentChampionId) {
+            const favorites = FavoritesManager.getFavoriteSkinsForChampion(this.currentChampionId);
+            skinsToDisplay = skins.filter(skin => favorites.has(skin.id));
+        }
+
+        if (skinsToDisplay.length === 0) {
             const emptyMsg = document.createElement('p');
             emptyMsg.className = 'text-center';
             emptyMsg.style.gridColumn = '1 / -1';
-            emptyMsg.textContent = 'No skins available for this champion';
+            if (this.showFavoritesOnly) {
+                emptyMsg.textContent = 'No favorite skins for this champion. Click the ⭐ icon to favorite skins!';
+            } else {
+                emptyMsg.textContent = 'No skins available for this champion';
+            }
             this.elements.skinGrid.appendChild(emptyMsg);
             return;
         }
 
-        skins.forEach(skin => {
+        skinsToDisplay.forEach(skin => {
             const skinCard = document.createElement('div');
             skinCard.className = 'skin-card';
+            
+            // Add favorite button
+            const favoriteBtn = document.createElement('button');
+            favoriteBtn.className = 'favorite-btn';
+            const isFavorited = this.currentChampionId ? FavoritesManager.isFavorited(this.currentChampionId, skin.id) : false;
+            favoriteBtn.innerHTML = isFavorited ? '⭐' : '☆';
+            favoriteBtn.title = isFavorited ? 'Remove from favorites' : 'Add to favorites';
+            favoriteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this.currentChampionId) {
+                    const isNowFavorited = FavoritesManager.toggleFavorite(this.currentChampionId, skin.id);
+                    favoriteBtn.innerHTML = isNowFavorited ? '⭐' : '☆';
+                    favoriteBtn.title = isNowFavorited ? 'Remove from favorites' : 'Add to favorites';
+                    this.log(isNowFavorited ? `Added ${skin.name} to favorites` : `Removed ${skin.name} from favorites`, 'info');
+                    this.updateAutoPickToggleState();
+                }
+            });
+            skinCard.appendChild(favoriteBtn);
             
             // Add chroma indicator badge if skin has chromas
             if (skin.hasOwnedChromas && skin.chromas) {
@@ -361,6 +511,40 @@ class SkinSelectorUI {
             
             this.elements.skinGrid.appendChild(skinCard);
         });
+        
+        // Update toggle state since favorites may have changed
+        this.updateAutoPickToggleState();
+    }
+
+    private updateFavoritesButtonState(): void {
+        if (!this.elements.showFavoritesBtn) return;
+        this.elements.showFavoritesBtn.className = this.showFavoritesOnly 
+            ? 'btn btn-secondary active' 
+            : 'btn btn-secondary';
+        this.elements.showFavoritesBtn.textContent = this.showFavoritesOnly 
+            ? '⭐ Favorites Only' 
+            : '☆ All Skins';
+    }
+
+    private updateAutoPickToggleState(): void {
+        const hasFavorites = this.currentChampionId 
+            ? FavoritesManager.getFavoriteSkinsForChampion(this.currentChampionId).size > 0 
+            : false;
+        
+        this.elements.autoPickToggle.disabled = !hasFavorites;
+        const toggleLabel = this.elements.autoPickToggle.closest('.checkbox-label') as HTMLElement | null;
+        
+        if (toggleLabel) {
+            if (hasFavorites) {
+                toggleLabel.style.opacity = '1';
+                toggleLabel.style.cursor = 'pointer';
+                toggleLabel.title = '';
+            } else {
+                toggleLabel.style.opacity = '0.5';
+                toggleLabel.style.cursor = 'not-allowed';
+                toggleLabel.title = 'Favorite some skins first to use auto-pick';
+            }
+        }
     }
 
     private async selectSkin(skinId: number, skinName: string, chromaId: number | null = null): Promise<void> {
@@ -414,7 +598,19 @@ class SkinSelectorUI {
             return;
         }
 
-        const randomSkin = this.currentSkins[Math.floor(Math.random() * this.currentSkins.length)];
+        // If favorites-only mode is enabled, pick from favorites only
+        let skinsToPickFrom = this.currentSkins;
+        if (this.favoritesOnlyMode) {
+            const favorites = FavoritesManager.getFavoriteSkinsForChampion(this.currentChampionId);
+            skinsToPickFrom = this.currentSkins.filter(skin => favorites.has(skin.id));
+            
+            if (skinsToPickFrom.length === 0) {
+                this.log('No favorited skins to auto-pick', 'warning');
+                return;
+            }
+        }
+
+        const randomSkin = skinsToPickFrom[Math.floor(Math.random() * skinsToPickFrom.length)];
         if (!randomSkin) return;
         await this.selectSkin(randomSkin.id, randomSkin.name);
     }

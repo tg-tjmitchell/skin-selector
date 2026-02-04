@@ -48,6 +48,7 @@
 - **No Unit Tests**: Project currently lacks Jest/Vitest setup. If adding tests, create `src/tests/` and update tsconfig.
 
 ## Common Pitfalls
+- **THIS IS A TYPESCRIPT/JAVASCRIPT PROJECT - DO NOT USE PYTHON TOOLS** - No Python is used anywhere. Use Node.js tools and npm commands only.
 - **Use `this.logger` not `console.log`** in `server.ts` for consistency
 - **Don't add Node.js imports** in `src/renderer/` code—use IPC via `electronAPI`
 - **Always update `api-types.ts`** when adding or modifying API endpoints
