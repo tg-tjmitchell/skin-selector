@@ -20,7 +20,8 @@
   - `npm run copy:static` - Copies HTML/CSS to `dist/renderer/`
 
 ### Architecture Decisions
-- **No Module Bundler for Renderer**: Renderer uses esbuild (single IIFE bundle), NOT webpack/vite. Update `build:renderer` script if adding vendor deps to renderer.
+- **No Module Bundler for Renderer**: Renderer uses esbuild (single IIFE bundle), NOT webpack/vite. If adding vendor deps to renderer, update the build step to include them in the esbuild config.
+- **TypeScript Configs**: Three tsconfigs serve different purposes—`tsconfig.json` compiles main process, `tsconfig.client.json` compiles renderer (browser environment), `tsconfig.base.json` shares common settings.
 - **Shared Type Definitions**: `src/shared/api-types.ts` defines all REST request/response payloads. Always add types here when modifying API endpoints.
 - **LCU Connection**: Abstracted in `LCUConnector` class (`src/main/lcu-client.ts`). Uses `@hasagi/core` library which wraps Riot's LCU socket protocol. Connection lifecycle: auto-retry on disconnect via timer.
 - **Graceful Shutdown**: Both Electron (`electron-main.ts`) and Express (`index.ts`) handle SIGINT/SIGTERM with cleanup routines (window state save, LCU disconnect).
@@ -30,7 +31,7 @@
 - **Renderer Logic**: `src/renderer/` (browser code, NO Node.js modules, IPC via `electronAPI`)
 - **Shared (Browser + Node)**: `src/shared/` (TypeScript types, error handling, logging)
 - **API Contracts**: `src/shared/api-types.ts` (REST payload shapes)
-- **IPC Bridge**: `src/preload/preload.ts` (isolated context exposing limited `electronAPI` to renderer)
+- **IPC Bridge**: `src/preload/preload.ts` (isolated context exposing `electronAPI` to renderer with methods for window control, file dialogs, and app updates—never expose dangerous APIs directly)
 
 ### LCU API Integration Details
 - **Connection Mechanism**: `LCUConnector` parses League client process + connects via WebSocket to local LCU socket
@@ -46,6 +47,20 @@
 - **Pre-commit Hooks**: Configured via husky + lint-staged in `package.json` - auto-lints *.ts/*.js and HTML files before commit.
 - **No Unit Tests**: Project currently lacks Jest/Vitest setup. If adding tests, create `src/tests/` and update tsconfig.
 
+## Common Pitfalls
+- **Use `this.logger` not `console.log`** in `server.ts` for consistency
+- **Don't add Node.js imports** in `src/renderer/` code—use IPC via `electronAPI`
+- **Always update `api-types.ts`** when adding or modifying API endpoints
+- **Test HTML closing tags** in `index.html`—previous bugs found with mismatched `</div>`
+- **Avoid dynamic `require()`** in `server.ts`—use static ES6 imports at the top
+
+## Anti-Patterns to Avoid
+- Don't use webpack/vite for renderer—only esbuild (single-file bundle)
+- Don't add React/Vue—vanilla JS only for renderer
+- Don't call LCU directly from renderer code—route through Express API endpoints
+- Don't modify `package.json` scripts without understanding the three-layer build process
+- Don't expose sensitive `electronAPI` methods (like unchecked file system access) in preload
+
 ## Common Workflows
 
 ### Adding a New API Endpoint
@@ -54,7 +69,7 @@
 3. Call from renderer via `fetch('/api/endpoint-name')` in `src/renderer/client.ts`
 
 ### Modifying Renderer UI
-- Edit `src/renderer/client.ts` (single 657-line file) and `src/renderer/index.html`
+- Edit `src/renderer/client.ts` (single-file UI controller) and `src/renderer/index.html`
 - Build with `npm run build:renderer` (produces single JS bundle, no bundler config needed)
 - No CSS framework used - plain CSS in `src/renderer/style.css`
 
@@ -92,12 +107,12 @@ src/main/
   └─ portable-updater.ts → Portable EXE auto-update logic
 
 src/renderer/
-  ├─ client.ts           → Vanilla JS UI controller (657 lines)
+  ├─ client.ts           → Vanilla JS UI controller
   ├─ index.html          → Single-page app template
   └─ style.css           → App styling
 
 src/shared/
   ├─ api-types.ts        → REST API type definitions
-  ├─ errors.ts           → Error utility functions
+  ├─ errors.ts           → Error utility functions (errors.js is a build artifact)
   └─ logger.ts           → Logging abstraction
 ```
