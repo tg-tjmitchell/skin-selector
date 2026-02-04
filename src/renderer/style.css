@@ -28,9 +28,30 @@ body {
     overflow-x: hidden;
 }
 
+.test-update-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, #ff6b6b, #feca57);
+    color: #000;
+    text-align: center;
+    padding: 12px;
+    font-weight: bold;
+    font-size: 1.1em;
+    z-index: 9999;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
 .container {
     max-width: 1000px;
     margin: 0 auto;
+    margin-top: 50px;
 }
 
 /* Header */
