@@ -194,9 +194,9 @@ class SkinSelectorUI {
 
     private hideQrForWeb(): void {
         if (this.isElectronApp()) return;
-        const qrCard = document.querySelector('.qr-code-card');
-        if (qrCard) {
-            qrCard.remove();
+        const headerActions = document.querySelector('.header-actions');
+        if (headerActions) {
+            headerActions.remove();
         }
     }
 
@@ -291,14 +291,28 @@ class SkinSelectorUI {
 
         // QR Code toggle (Electron only)
         if (this.isElectronApp()) {
-            const toggleQrBtn = document.getElementById('toggleQrBtn');
+            const toggleQrBtn = document.getElementById('toggleQrBtn') as HTMLButtonElement | null;
             const qrContainer = document.getElementById('qrContainer');
             if (toggleQrBtn && qrContainer) {
-                toggleQrBtn.addEventListener('click', () => {
+                toggleQrBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
                     qrContainer.classList.toggle('hidden');
-                    toggleQrBtn.textContent = qrContainer.classList.contains('hidden') ? 'Show QR' : 'Hide QR';
-                    if (!qrContainer.classList.contains('hidden') && !this.qrGenerated) {
+                    const isOpen = !qrContainer.classList.contains('hidden');
+                    toggleQrBtn.classList.toggle('active', isOpen);
+                    toggleQrBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    if (isOpen && !this.qrGenerated) {
                         this.generateQRCode();
+                    }
+                });
+
+                document.addEventListener('click', (event) => {
+                    const target = event.target as Node;
+                    if (!qrContainer.classList.contains('hidden')
+                        && !qrContainer.contains(target)
+                        && !toggleQrBtn.contains(target)) {
+                        qrContainer.classList.add('hidden');
+                        toggleQrBtn.classList.remove('active');
+                        toggleQrBtn.setAttribute('aria-expanded', 'false');
                     }
                 });
             }
