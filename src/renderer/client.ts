@@ -56,6 +56,9 @@ interface DOMElements {
     autoPickToggle: HTMLInputElement;
     logContainer: HTMLElement;
     showFavoritesBtn: HTMLButtonElement | null;
+    previewModal: HTMLElement | null;
+    previewImage: HTMLImageElement | null;
+    previewClose: HTMLElement | null;
 }
 
 type LogType = 'info' | 'success' | 'warning' | 'error';
@@ -157,6 +160,8 @@ class SkinSelectorUI {
     private elements!: DOMElements;
     private qrGenerated: boolean = false;
     private showFavoritesOnly: boolean = false;
+    private keyboardShortcutsEnabled: boolean = true;
+    private displayedSkinCards: HTMLElement[] = [];
 
     constructor() {
         this.init();
@@ -169,6 +174,8 @@ class SkinSelectorUI {
         this.loadFavoritesFilterState();
         this.updateAutoPickToggleState();
         this.updateFavoritesButtonState();
+        this.setupKeyboardShortcuts();
+        this.setupPreviewModal();
         this.startStatusMonitor();
     }
 
@@ -191,7 +198,10 @@ class SkinSelectorUI {
             refreshBtn: this.getElement('refreshBtn') as HTMLButtonElement,
             autoPickToggle: this.getElement('autoPickToggle') as HTMLInputElement,
             logContainer: this.getElement('logContainer'),
-            showFavoritesBtn: document.getElementById('showFavoritesBtn') as HTMLButtonElement | null
+            showFavoritesBtn: document.getElementById('showFavoritesBtn') as HTMLButtonElement | null,
+            previewModal: document.getElementById('skinPreviewModal'),
+            previewImage: document.getElementById('previewImage') as HTMLImageElement | null,
+            previewClose: document.getElementById('previewClose')
         };
     }
 
@@ -259,6 +269,105 @@ class SkinSelectorUI {
                 }
             });
         }
+    }
+
+    private setupKeyboardShortcuts(): void {
+        document.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (!this.keyboardShortcutsEnabled) return;
+            
+            // Check if input/textarea is focused
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+
+            const key = parseInt(e.key, 10);
+            
+            // Check if key is a number 1-9
+            if (!isNaN(key) && key >= 1 && key <= 9) {
+                e.preventDefault();
+                this.selectSkinByKeyboardShortcut(key);
+            }
+        });
+    }
+
+    private selectSkinByKeyboardShortcut(position: number): void {
+        // Filter skins based on current display mode
+        let skinsToUse = this.currentSkins;
+        if (this.showFavoritesOnly && this.currentChampionId) {
+            const favorites = FavoritesManager.getFavoriteSkinsForChampion(this.currentChampionId);
+            skinsToUse = this.currentSkins.filter(skin => favorites.has(skin.id));
+        }
+
+        if (position > skinsToUse.length) {
+            this.log(`Only ${skinsToUse.length} skins available`, 'warning');
+            return;
+        }
+
+        const selectedSkin = skinsToUse[position - 1];
+        if (selectedSkin) {
+            if (selectedSkin.hasOwnedChromas) {
+                this.showChromaSelection(selectedSkin);
+                this.log(`Opened chromas for ${selectedSkin.name} (Press 1-9 to select chroma)`, 'info');
+            } else {
+                this.selectSkin(selectedSkin.id, selectedSkin.name);
+            }
+        }
+    }
+
+    private setupPreviewModal(): void {
+        // Create modal if it doesn't exist
+        if (!this.elements.previewModal) {
+            const modal = document.createElement('div');
+            modal.id = 'skinPreviewModal';
+            modal.className = 'preview-modal hidden';
+            modal.innerHTML = `
+                <div class="preview-modal-content">
+                    <button class="preview-close" id="previewClose">&times;</button>
+                    <img id="previewImage" class="preview-image" alt="Skin preview">
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Recache elements
+            this.elements.previewModal = modal;
+            this.elements.previewImage = document.getElementById('previewImage') as HTMLImageElement;
+            this.elements.previewClose = document.getElementById('previewClose');
+        }
+
+        // Setup event listeners
+        if (this.elements.previewModal) {
+            this.elements.previewModal.addEventListener('click', (e) => {
+                if (e.target === this.elements.previewModal) {
+                    this.closePreviewModal();
+                }
+            });
+        }
+
+        if (this.elements.previewClose) {
+            this.elements.previewClose.addEventListener('click', () => this.closePreviewModal());
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && this.elements.previewModal && !this.elements.previewModal.classList.contains('hidden')) {
+                this.closePreviewModal();
+            }
+        });
+    }
+
+    private openPreviewModal(imageUrl: string): void {
+        if (!this.elements.previewModal || !this.elements.previewImage) return;
+        
+        this.elements.previewImage.src = imageUrl;
+        this.elements.previewModal.classList.remove('hidden');
+        this.keyboardShortcutsEnabled = false;
+    }
+
+    private closePreviewModal(): void {
+        if (!this.elements.previewModal) return;
+        
+        this.elements.previewModal.classList.add('hidden');
+        this.keyboardShortcutsEnabled = true;
     }
 
     private async updateStatus(): Promise<void> {
@@ -416,6 +525,7 @@ class SkinSelectorUI {
     private renderSkins(skins: SkinData[]): void {
         this.elements.skinSelectionArea.style.display = 'block';
         this.elements.skinGrid.innerHTML = '';
+        this.displayedSkinCards = [];
 
         // Filter to favorites if enabled
         let skinsToDisplay = skins;
@@ -437,7 +547,7 @@ class SkinSelectorUI {
             return;
         }
 
-        skinsToDisplay.forEach(skin => {
+        skinsToDisplay.forEach((skin, index) => {
             const skinCard = document.createElement('div');
             skinCard.className = 'skin-card';
             
@@ -495,10 +605,28 @@ class SkinSelectorUI {
             infoDiv.innerHTML = `
                 <div class="skin-name">${skin.name}</div>
                 <div class="skin-id">ID: ${skin.id}</div>
+                <div class="skin-shortcut">Press ${index + 1}</div>
             `;
 
             skinCard.appendChild(img);
             skinCard.appendChild(infoDiv);
+            
+            // Add keyboard shortcut number badge
+            const shortcutBadge = document.createElement('div');
+            shortcutBadge.className = 'keyboard-shortcut-badge';
+            shortcutBadge.textContent = (index + 1).toString();
+            skinCard.appendChild(shortcutBadge);
+            
+            // Add preview button in corner
+            const previewBtn = document.createElement('button');
+            previewBtn.className = 'preview-btn';
+            previewBtn.title = 'Preview full image';
+            previewBtn.innerHTML = '🔍';
+            previewBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openPreviewModal(skin.splashUrl || skin.loadingUrl);
+            });
+            skinCard.appendChild(previewBtn);
             
             // Click handler: if has chromas, show chroma selection; otherwise select skin directly
             skinCard.addEventListener('click', () => {
@@ -510,6 +638,7 @@ class SkinSelectorUI {
             });
             
             this.elements.skinGrid.appendChild(skinCard);
+            this.displayedSkinCards.push(skinCard);
         });
         
         // Update toggle state since favorites may have changed

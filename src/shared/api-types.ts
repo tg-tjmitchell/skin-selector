@@ -63,6 +63,7 @@ export interface SkinData {
   chromas: ChromaData[];
   hasOwnedChromas: boolean;
   loadingUrl: string;
+  splashUrl?: string;
 }
 
 /**

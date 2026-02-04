@@ -56,6 +56,7 @@ type OwnedSkin = {
   }>;
   hasOwnedChromas: boolean;
   loadingUrl: string;
+  splashUrl?: string;
 };
 
 type DDragonChampion = {
@@ -454,7 +455,9 @@ class LCUConnector {
           chromas,
           hasOwnedChromas: chromas.length > 0,
           // Use loading screen image (full champion art)
-          loadingUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championName}_${skinNum}.jpg`
+          loadingUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championName}_${skinNum}.jpg`,
+          // Use splash art image
+          splashUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_${skinNum}.jpg`
         };
       });
   }

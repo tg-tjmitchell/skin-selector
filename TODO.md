@@ -16,8 +16,8 @@
 
 - [x] **Add skin favorites/preferences** - Store user's favorite skins per champion in localStorage or config file. Auto-pick now picks from favorites only when enabled and is greyed out when no favorites exist.
 - [ ] **Add skin search/filter** - Allow filtering skins by name in the UI
-- [ ] **Add keyboard shortcuts** - Quick skin selection with number keys
-- [ ] **Add skin preview enlargement** - Click to see full-size skin loading art
+- [x] **Add keyboard shortcuts** - Quick skin selection with number keys
+- [x] **Add skin preview enlargement** - Click to see full-size skin loading art
 
 ## 🏗️ Architecture Improvements
 

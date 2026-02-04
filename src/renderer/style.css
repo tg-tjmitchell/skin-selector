@@ -185,6 +185,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    position: relative;
 }
 
 .skin-card:hover {
@@ -222,6 +223,59 @@ body {
     border-color: var(--warning-color);
     transform: scale(1.1);
     box-shadow: 0 0 10px rgba(250, 173, 20, 0.4);
+}
+
+/* Keyboard Shortcut Badge */
+.keyboard-shortcut-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(10, 126, 164, 0.9);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 700;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+}
+
+/* Preview Button */
+.preview-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(10, 126, 164, 0.8);
+    border: 1px solid rgba(10, 126, 164, 0.9);
+    color: white;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 1.1em;
+    cursor: pointer;
+    z-index: 12;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    line-height: 1;
+}
+
+.preview-btn:hover {
+    background: rgba(10, 126, 164, 0.95);
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(10, 126, 164, 0.6);
+}
+
+.preview-btn:active {
+    transform: scale(0.95);
 }
 
 .skin-image {
@@ -902,4 +956,87 @@ input:checked + .slider:before {
     color: var(--text-secondary);
     font-size: 0.9rem;
     text-align: center;
+}
+
+/* Skin Preview Modal */
+.preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.preview-modal.hidden {
+    display: none;
+}
+
+.preview-modal-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+    animation: zoomIn 0.3s ease-out;
+}
+
+.preview-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 2.5em;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 2001;
+    backdrop-filter: blur(4px);
+    line-height: 1;
+}
+
+.preview-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
