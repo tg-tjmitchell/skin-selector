@@ -41,6 +41,18 @@ type ReadyCheckState = {
   playerResponse?: string;
 };
 
+type BenchChampion = {
+  championId: number;
+  isPriority: boolean;
+  pickable?: boolean;
+};
+
+type SubsetChampionList = {
+  championIds: number[];
+  maxChampionsRequiredSelectable: number;
+  subsetSize: number;
+};
+
 type OwnedSkin = {
   id: number;
   name: string;
@@ -380,7 +392,7 @@ class LCUConnector {
     }
   }
 
-  private async getLatestDdragonVersion(): Promise<string> {
+  async getLatestDdragonVersion(): Promise<string> {
     if (this.ddragonVersion) {
       return this.ddragonVersion;
     }
@@ -563,6 +575,117 @@ class LCUConnector {
       return true;
     } catch (error) {
       throw new Error(`Failed to accept ready check: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * Get subset champion list (ARAM/Mayhem)
+   * Returns the list of champions available for selection in game modes with limited champion pools
+   */
+  async getSubsetChampionList(): Promise<SubsetChampionList | null> {
+    try {
+      // The API may return either the full object or just the championIds array
+      const result = await this.client.request("get", "/lol-lobby-team-builder/champ-select/v1/subset-champion-list") as unknown;
+      
+      if (Array.isArray(result)) {
+        // If it's just an array of champion IDs
+        return {
+          championIds: result,
+          maxChampionsRequiredSelectable: result.length,
+          subsetSize: result.length
+        };
+      } else if (result && typeof result === 'object' && 'championIds' in result) {
+        // If it's the full object
+        return result as SubsetChampionList;
+      }
+      
+      return null;
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get bench champions (ARAM/Mayhem)
+   * Returns the list of champions on the bench that can be swapped with
+   */
+  async getBenchChampions(): Promise<BenchChampion[]> {
+    try {
+      const session = await this.getChampSelectSession();
+      if (!session) {
+        return [];
+      }
+
+      // The bench is part of the session object
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const bench = (session as any).benchChampions || (session as any).bench || [];
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+      return Array.isArray(bench) ? bench : [];
+    } catch (error) {
+      console.error("Failed to get bench champions:", getErrorMessage(error));
+      return [];
+    }
+  }
+
+  /**
+   * Pick a champion from the subset list (ARAM/Mayhem)
+   * @param championId The ID of the champion to pick
+   */
+  async pickChampion(championId: number): Promise<boolean> {
+    try {
+      const session = await this.getChampSelectSession();
+      if (!session) {
+        throw new Error("Not in champion select");
+      }
+
+      const pickAction = this.getLocalPlayerPickAction(session);
+      if (!pickAction) {
+        throw new Error("Pick action not found for local player");
+      }
+
+      // Complete the pick action with the selected champion
+      await this.client.request(
+        "patch",
+        "/lol-champ-select/v1/session/actions/{id}",
+        {
+          path: { id: String(pickAction.id) },
+          body: {
+            ...pickAction,
+            championId,
+            completed: true
+          }
+        }
+      );
+
+      console.log(`Successfully picked champion ID: ${championId}`);
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to pick champion: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * Swap with a bench champion (ARAM/Mayhem)
+   * @param championId The ID of the bench champion to swap with
+   */
+  async swapWithBenchChampion(championId: number): Promise<boolean> {
+    try {
+      // Endpoint not in HasagiClient types but exists in LCU API
+      await this.client.request(
+        "post",
+        "/lol-champ-select/v1/session/bench/swap/{championId}",
+        {
+          path: { championId: String(championId) }
+        }
+      );
+
+      console.log(`Successfully swapped with bench champion ID: ${championId}`);
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to swap with bench champion: ${getErrorMessage(error)}`);
     }
   }
 }

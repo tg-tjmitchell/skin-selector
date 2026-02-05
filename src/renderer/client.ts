@@ -11,7 +11,14 @@ import type {
     ErrorResponse,
     FavoritesResponse,
     ToggleFavoriteRequest,
-    ToggleFavoriteResponse
+    ToggleFavoriteResponse,
+    AvailableChampionsResponse,
+    ChampionPickerData,
+    BenchChampion,
+    PickChampionRequest,
+    PickChampionResponse,
+    SwapBenchRequest,
+    SwapBenchResponse
 } from '../shared/api-types';
 
 interface PortableUpdateInfo {
@@ -48,6 +55,11 @@ interface DOMElements {
     selectedChampion: HTMLElement;
     readyCheckPopup: HTMLElement;
     acceptQueueBtn: HTMLButtonElement;
+    championPickerArea: HTMLElement;
+    championGrid: HTMLElement;
+    availableTab: HTMLButtonElement | null;
+    benchTab: HTMLButtonElement | null;
+    benchCount: HTMLElement | null;
     skinSelectionArea: HTMLElement;
     skinGrid: HTMLElement;
     chromaSelectionArea: HTMLElement;
@@ -168,6 +180,12 @@ class SkinSelectorUI {
     private showFavoritesOnly: boolean = false;
     private keyboardShortcutsEnabled: boolean = true;
     private displayedSkinCards: HTMLElement[] = [];
+    private availableChampions: ChampionPickerData[] = [];
+    private benchChampions: BenchChampion[] = [];
+    private currentChampionTab: 'available' | 'bench' = 'available';
+    private benchLoggedOnce: boolean = false;
+    private showAvailableTab: boolean = true;
+    private lastBenchChampionIds: string = '';
 
     constructor() {
         this.init();
@@ -220,6 +238,11 @@ class SkinSelectorUI {
             selectedChampion: this.getElement('selectedChampion'),
             readyCheckPopup: this.getElement('readyCheckPopup'),
             acceptQueueBtn: this.getElement('acceptQueueBtn') as HTMLButtonElement,
+            championPickerArea: this.getElement('championPickerArea'),
+            championGrid: this.getElement('championGrid'),
+            availableTab: document.getElementById('availableTab') as HTMLButtonElement | null,
+            benchTab: document.getElementById('benchTab') as HTMLButtonElement | null,
+            benchCount: document.getElementById('benchCount'),
             skinSelectionArea: this.getElement('skinSelectionArea'),
             skinGrid: this.getElement('skinGrid'),
             chromaSelectionArea: this.getElement('chromaSelectionArea'),
@@ -270,6 +293,23 @@ class SkinSelectorUI {
         
         if (this.elements.backToSkinsBtn) {
             this.elements.backToSkinsBtn.addEventListener('click', () => this.showSkinSelection());
+        }
+
+        // Champion picker tabs
+        if (this.elements.availableTab) {
+            this.elements.availableTab.addEventListener('click', () => {
+                this.currentChampionTab = 'available';
+                this.updateChampionTabs();
+                this.renderChampions();
+            });
+        }
+
+        if (this.elements.benchTab) {
+            this.elements.benchTab.addEventListener('click', () => {
+                this.currentChampionTab = 'bench';
+                this.updateChampionTabs();
+                this.renderChampions();
+            });
         }
         
         this.elements.autoPickToggle.addEventListener('change', () => {
@@ -442,6 +482,15 @@ class SkinSelectorUI {
                 const isLockedIn = !!data.lockedIn;
                 const championChanged = data.selectedChampionId && this.currentChampionId !== data.selectedChampionId;
                 
+                // Check for champion picker modes (ARAM/Mayhem)
+                const shouldLoadChampions = !this.currentChampionId || championChanged;
+                if (shouldLoadChampions) {
+                    await this.loadAvailableChampions();
+                } else {
+                    // Check if bench has changed (other players swapping)
+                    await this.checkAndRefreshBench();
+                }
+                
                 // If champion ID changed, refresh skins
                 if (championChanged && data.selectedChampionId) {
                     this.currentChampionId = data.selectedChampionId;
@@ -475,7 +524,13 @@ class SkinSelectorUI {
                 this.currentChampionId = null;
                 this.lockedIn = false;
                 this.focusedChampionId = null;
+                this.elements.championPickerArea.style.display = 'none';
                 this.elements.skinSelectionArea.style.display = 'none';
+                this.availableChampions = [];
+                this.benchChampions = [];
+                this.benchLoggedOnce = false;
+                this.showAvailableTab = true;
+                this.lastBenchChampionIds = '';
                 this.updateAutoPickToggleState();
             }
 
@@ -1036,6 +1091,256 @@ class SkinSelectorUI {
                 console.error('Error fetching QR code:', error);
                 this.log('Failed to fetch QR code', 'error');
             });
+    }
+
+    private async checkAndRefreshBench(): Promise<void> {
+        try {
+            const response = await fetch('/api/available-champions');
+            const data = await response.json() as AvailableChampionsResponse | ErrorResponse;
+
+            if ('error' in data) {
+                return;
+            }
+
+            // Create a unique ID string from bench champion IDs
+            const currentBenchIds = data.bench.map(b => b.championId).sort().join(',');
+            
+            // If bench has changed, update it
+            if (currentBenchIds !== this.lastBenchChampionIds && this.lastBenchChampionIds !== '') {
+                this.benchChampions = data.bench;
+                this.availableChampions = data.champions;
+                
+                if (this.elements.benchCount) {
+                    this.elements.benchCount.textContent = String(data.bench.length);
+                }
+                
+                // Only re-render if we're viewing the bench
+                if (this.currentChampionTab === 'bench' && this.elements.championPickerArea.style.display !== 'none') {
+                    this.renderChampions();
+                    this.log(`Bench updated (${data.bench.length} champions)`, 'info');
+                }
+            }
+            
+            this.lastBenchChampionIds = currentBenchIds;
+        } catch (_error) {
+            // Silently fail - don't spam errors during normal polling
+        }
+    }
+
+    private async loadAvailableChampions(): Promise<void> {
+        try {
+            const response = await fetch('/api/available-champions');
+            const data = await response.json() as AvailableChampionsResponse | ErrorResponse;
+
+            if ('error' in data) {
+                this.log(`Error loading champions: ${data.error}`, 'error');
+                return;
+            }
+
+            this.availableChampions = data.champions;
+            this.benchChampions = data.bench;
+            
+            // Track bench state for change detection
+            this.lastBenchChampionIds = data.bench.map(b => b.championId).sort().join(',');
+
+            // Update bench count
+            if (this.elements.benchCount) {
+                this.elements.benchCount.textContent = String(data.bench.length);
+            }
+
+            // Show champion picker if we have a subset list (ARAM/Mayhem) or bench champions
+            if (data.subsetList && data.subsetList.length > 0 && !this.currentChampionId) {
+                // Initial pick phase - show available champions (only before picking)
+                this.elements.championPickerArea.style.display = 'block';
+                this.currentChampionTab = 'available';
+                this.showAvailableTab = true;
+                this.updateChampionTabs();
+                this.renderChampions();
+                this.log(`Champion picker loaded (${data.champions.length} available, ${data.bench.length} on bench)`, 'info');
+            } else if (data.bench.length > 0) {
+                // Post-pick phase - only show bench
+                this.elements.championPickerArea.style.display = 'block';
+                this.currentChampionTab = 'bench';
+                this.showAvailableTab = false;
+                this.updateChampionTabs();
+                this.renderChampions();
+                if (!this.benchLoggedOnce) {
+                    this.log(`Bench available (${data.bench.length} champions)`, 'info');
+                    this.benchLoggedOnce = true;
+                }
+            } else {
+                // No champion picker needed - normal draft/blind
+                this.elements.championPickerArea.style.display = 'none';
+                this.benchLoggedOnce = false;
+                this.showAvailableTab = true;
+            }
+        } catch (error) {
+            this.log(`Failed to load champions: ${getErrorMessage(error)}`, 'error');
+        }
+    }
+
+    private renderChampions(): void {
+        this.elements.championGrid.innerHTML = '';
+
+        const championsToShow = this.currentChampionTab === 'available' 
+            ? this.availableChampions 
+            : this.availableChampions.filter(c => this.benchChampions.some(b => b.championId === c.id));
+
+        if (championsToShow.length === 0) {
+            const emptyMsg = document.createElement('p');
+            emptyMsg.className = 'text-center';
+            emptyMsg.style.gridColumn = '1 / -1';
+            emptyMsg.textContent = this.currentChampionTab === 'bench' 
+                ? 'No champions on bench' 
+                : 'No champions available';
+            this.elements.championGrid.appendChild(emptyMsg);
+            return;
+        }
+
+        championsToShow.forEach(champion => {
+            const championCard = document.createElement('div');
+            championCard.className = 'champion-card';
+
+            const benchInfo = this.benchChampions.find(b => b.championId === champion.id);
+            const isBench = !!benchInfo;
+            const canSwap = !benchInfo || benchInfo.pickable !== false;
+
+            // Disable card if it's on bench but not pickable (cooldown/restriction)
+            if (isBench && !canSwap) {
+                championCard.classList.add('champion-disabled');
+                championCard.title = 'Cannot swap (cooldown or restriction)';
+            }
+
+            const img = document.createElement('img');
+            img.className = 'champion-image';
+            img.alt = champion.name;
+            img.src = champion.imageUrl;
+            img.onerror = () => {
+                img.style.display = 'none';
+                const placeholder = document.createElement('div');
+                placeholder.className = 'champion-image-placeholder';
+                placeholder.textContent = '🎮';
+                img.parentNode?.insertBefore(placeholder, img);
+            };
+
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'champion-name';
+            nameDiv.textContent = champion.name;
+
+            championCard.appendChild(img);
+            championCard.appendChild(nameDiv);
+
+            if (canSwap) {
+                championCard.addEventListener('click', () => {
+                    if (this.currentChampionTab === 'bench' || isBench) {
+                        this.swapBenchChampion(champion.id, champion.name);
+                    } else {
+                        this.pickChampion(champion.id, champion.name);
+                    }
+                });
+            }
+
+            this.elements.championGrid.appendChild(championCard);
+        });
+    }
+
+    private updateChampionTabs(): void {
+        if (this.elements.availableTab) {
+            // Hide available tab after champion is picked
+            if (this.showAvailableTab) {
+                this.elements.availableTab.style.display = '';
+                if (this.currentChampionTab === 'available') {
+                    this.elements.availableTab.classList.add('active');
+                } else {
+                    this.elements.availableTab.classList.remove('active');
+                }
+            } else {
+                this.elements.availableTab.style.display = 'none';
+            }
+        }
+
+        if (this.elements.benchTab) {
+            if (this.currentChampionTab === 'bench') {
+                this.elements.benchTab.classList.add('active');
+            } else {
+                this.elements.benchTab.classList.remove('active');
+            }
+        }
+    }
+
+    private async pickChampion(championId: number, championName: string): Promise<void> {
+        try {
+            const payload: PickChampionRequest = { championId };
+            const response = await fetch('/api/pick-champion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json() as PickChampionResponse | ErrorResponse;
+
+            if ('error' in result) {
+                this.log(`Failed to pick ${championName}: ${result.error}`, 'error');
+                this.showToast(`Failed to pick ${championName}`, 'error');
+                return;
+            }
+
+            this.log(`Picked ${championName}`, 'success');
+            this.showToast(`Picked ${championName}`, 'success');
+            
+            // Set champion ID and switch to bench-only mode
+            this.currentChampionId = championId;
+            this.currentChampionTab = 'bench';
+            this.showAvailableTab = false;
+            await this.loadAvailableChampions();
+            // Force UI update to hide available tab
+            this.updateChampionTabs();
+            this.renderChampions();
+            await this.refreshSkins();
+        } catch (error) {
+            this.log(`Error picking champion: ${getErrorMessage(error)}`, 'error');
+            this.showToast('Error picking champion', 'error');
+        }
+    }
+
+    private async swapBenchChampion(championId: number, championName: string): Promise<void> {
+        try {
+            const payload: SwapBenchRequest = { championId };
+            const response = await fetch('/api/swap-bench', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json() as SwapBenchResponse | ErrorResponse;
+
+            if ('error' in result) {
+                // Check for specific error messages about cooldowns
+                const errorMsg = result.error.toLowerCase();
+                if (errorMsg.includes('cooldown') || errorMsg.includes('wait')) {
+                    this.log(`Cannot swap ${championName}: On cooldown`, 'warning');
+                    this.showToast('Swap on cooldown, wait a moment', 'warning');
+                } else if (errorMsg.includes('invalid') || errorMsg.includes('cannot')) {
+                    this.log(`Cannot swap ${championName}: ${result.error}`, 'warning');
+                    this.showToast(`Cannot swap: ${result.error}`, 'warning');
+                } else {
+                    this.log(`Failed to swap with ${championName}: ${result.error}`, 'error');
+                    this.showToast(`Failed to swap with ${championName}`, 'error');
+                }
+                return;
+            }
+
+            this.log(`Swapped with ${championName}`, 'success');
+            this.showToast(`Swapped with ${championName}`, 'success');
+            
+            // Update champion ID and refresh bench + skins
+            this.currentChampionId = championId;
+            await this.loadAvailableChampions(); // Refresh bench list
+            await this.refreshSkins();
+        } catch (error) {
+            this.log(`Error swapping champion: ${getErrorMessage(error)}`, 'error');
+            this.showToast('Error swapping champion', 'error');
+        }
     }
 }
 

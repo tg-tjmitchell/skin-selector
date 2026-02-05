@@ -124,6 +124,72 @@ export interface AcceptReadyCheckResponse {
 }
 
 /**
+ * Bench champion data
+ */
+export interface BenchChampion {
+  championId: number;
+  isPriority: boolean;
+  pickable?: boolean;
+}
+
+/**
+ * Subset champion list response (ARAM/Mayhem)
+ */
+export interface SubsetChampionListResponse {
+  championIds: number[];
+  maxChampionsRequiredSelectable: number;
+  subsetSize: number;
+}
+
+/**
+ * Champion data for picker
+ */
+export interface ChampionPickerData {
+  id: number;
+  name: string;
+  imageUrl: string;
+}
+
+/**
+ * Available champions response
+ */
+export interface AvailableChampionsResponse {
+  subsetList: number[] | null;
+  bench: BenchChampion[];
+  champions: ChampionPickerData[];
+}
+
+/**
+ * Pick champion request
+ */
+export interface PickChampionRequest {
+  championId: number;
+}
+
+/**
+ * Pick champion response
+ */
+export interface PickChampionResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Swap bench champion request
+ */
+export interface SwapBenchRequest {
+  championId: number;
+}
+
+/**
+ * Swap bench champion response
+ */
+export interface SwapBenchResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
  * Generic error response
  */
 export interface ErrorResponse {
@@ -141,5 +207,8 @@ export const API_ENDPOINTS = {
   SELECT_SKIN: "/api/select-skin",
   ACCEPT_READY_CHECK: "/api/accept-ready-check",
   FAVORITES: "/api/favorites",
-  TOGGLE_FAVORITE: "/api/favorites/toggle"
+  TOGGLE_FAVORITE: "/api/favorites/toggle",
+  AVAILABLE_CHAMPIONS: "/api/available-champions",
+  PICK_CHAMPION: "/api/pick-champion",
+  SWAP_BENCH: "/api/swap-bench"
 } as const;

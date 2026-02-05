@@ -19,7 +19,13 @@ import type {
   ErrorResponse,
   FavoritesResponse,
   ToggleFavoriteRequest,
-  ToggleFavoriteResponse
+  ToggleFavoriteResponse,
+  AvailableChampionsResponse,
+  ChampionPickerData,
+  PickChampionRequest,
+  PickChampionResponse,
+  SwapBenchRequest,
+  SwapBenchResponse
 } from "../shared/api-types";
 
 const DEFAULT_PORT = 3000;
@@ -241,6 +247,86 @@ export class SkinSelectorServer {
       }
     });
 
+    // Get available champions (subset list + bench for ARAM/Mayhem)
+    this.app.get("/api/available-champions", async (_req: Request, res: Response<AvailableChampionsResponse | ErrorResponse>) => {
+      try {
+        if (!this.lcu || !(await this.lcu.isConnected())) {
+          return this.respondError(res, 503, "Not connected to League Client");
+        }
+
+        // Get subset champion list (null if not in ARAM/Mayhem)
+        const subsetListData = await this.lcu.getSubsetChampionList();
+        const subsetList = subsetListData?.championIds || null;
+
+        // Get bench champions
+        const bench = await this.lcu.getBenchChampions();
+
+        // Get champion name map
+        const championMap = await this.lcu.getChampionNameMap();
+        const ddragonVersion = await this.lcu.getLatestDdragonVersion();
+
+        // Build champion data for all available champions
+        const champions: ChampionPickerData[] = [];
+        const championIds = subsetList || bench.map(b => b.championId);
+
+        for (const championId of championIds) {
+          const championName = championMap[championId] || `Champion${championId}`;
+          champions.push({
+            id: championId,
+            name: championName,
+            imageUrl: `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/champion/${championName}.png`
+          });
+        }
+
+        return res.json({ subsetList, bench, champions });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
+    // Pick a champion (ARAM/Mayhem)
+    this.app.post("/api/pick-champion", async (req: Request, res: Response<PickChampionResponse | ErrorResponse>) => {
+      try {
+        if (!this.lcu || !(await this.lcu.isConnected())) {
+          return this.respondError(res, 503, "Not connected to League Client");
+        }
+
+        const { championId } = req.body as PickChampionRequest;
+
+        if (!championId) {
+          return this.respondError(res, 400, "Missing championId");
+        }
+
+        await this.lcu.pickChampion(championId);
+        return res.json({ success: true, message: `Picked champion ${championId}` });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
+    // Swap with bench champion (ARAM/Mayhem)
+    this.app.post("/api/swap-bench", async (req: Request, res: Response<SwapBenchResponse | ErrorResponse>) => {
+      try {
+        if (!this.lcu || !(await this.lcu.isConnected())) {
+          return this.respondError(res, 503, "Not connected to League Client");
+        }
+
+        const { championId } = req.body as SwapBenchRequest;
+
+        if (!championId) {
+          return this.respondError(res, 400, "Missing championId");
+        }
+
+        await this.lcu.swapWithBenchChampion(championId);
+        return res.json({ success: true, message: `Swapped with bench champion ${championId}` });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
     // Serve main page
     this.app.get("/", (_req: Request, res: Response) => {
       res.sendFile(path.join(__dirname, "../renderer/index.html"));
@@ -295,7 +381,7 @@ export class SkinSelectorServer {
       const parsed = JSON.parse(raw) as Record<string, number[]>;
       this.favoritesCache = parsed;
       return parsed;
-    } catch (error) {
+    } catch (_error) {
       this.favoritesCache = {};
       return this.favoritesCache;
     }
