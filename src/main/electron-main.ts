@@ -156,7 +156,8 @@ app.whenReady().then(async () => {
       // This prevents race condition where user launches app before update installs
       setTimeout(() => {
         console.log("Installing update and restarting...");
-        autoUpdater.quitAndInstall(false, true);
+        // isSilent=true to avoid installer UI, isForceRunAfter=true to auto-restart
+        autoUpdater.quitAndInstall(true, true);
       }, 500);
     });
     
