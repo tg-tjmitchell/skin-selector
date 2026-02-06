@@ -20,6 +20,25 @@ export interface QRCodeResponse {
 }
 
 /**
+ * Network interface candidate for selection
+ */
+export interface NetworkInterface {
+  ip: string;
+  interfaceName: string;
+  isPreferred: boolean;
+  type: 'physical' | 'vpn' | 'other';
+}
+
+/**
+ * Network interfaces endpoint response
+ */
+export interface NetworkInterfacesResponse {
+  interfaces: NetworkInterface[];
+  preferredIp: string;
+  port: number;
+}
+
+/**
  * Ready check state
  */
 export interface ReadyCheckState {

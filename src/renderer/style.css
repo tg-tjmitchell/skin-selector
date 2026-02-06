@@ -981,6 +981,76 @@ input:checked + .slider:before {
     color: var(--text-primary);
     font-size: 0.95rem;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.advanced-toggle {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.advanced-toggle:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.advanced-mode {
+    width: 100%;
+    padding: 12px 0;
+    border-top: 1px solid var(--border-color);
+    margin-top: 8px;
+}
+
+.advanced-mode.hidden {
+    display: none;
+}
+
+.network-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.network-selector label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.network-selector select {
+    padding: 8px 12px;
+    background: var(--dark-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.network-selector select:hover {
+    border-color: var(--primary-color);
+}
+
+.network-selector select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(10, 126, 164, 0.1);
 }
 
 #qrCanvas {
