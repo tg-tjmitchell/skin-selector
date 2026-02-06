@@ -1075,7 +1075,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (win.electronAPI.onUpdateDownloaded) {
             win.electronAPI.onUpdateDownloaded((version) => {
-                win.ui?.log(`✅ Update v${version} downloaded! Will install on restart.`, 'success');
+                win.ui?.log(`✅ Update v${version} ready! Restarting in a moment...`, 'success');
             });
         }
         if (win.electronAPI.onPortableUpdateAvailable) {

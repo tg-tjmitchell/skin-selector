@@ -118,7 +118,7 @@ app.whenReady().then(async () => {
   } else {
     // Installed version: use electron-updater for auto-updates
     autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoInstallOnAppQuit = false; // Disable to avoid race conditions
     
     autoUpdater.on("checking-for-update", () => {
       console.log("Checking for updates...");
@@ -151,6 +151,13 @@ app.whenReady().then(async () => {
       if (mainWindow) {
         mainWindow.webContents.send("update-downloaded", info.version);
       }
+      
+      // Install update immediately after download completes
+      // This prevents race condition where user launches app before update installs
+      setTimeout(() => {
+        console.log("Installing update and restarting...");
+        autoUpdater.quitAndInstall(false, true);
+      }, 500);
     });
     
     autoUpdater.on("error", (err) => {
