@@ -8,10 +8,12 @@ import type {
   SelectSkinRequest,
   SelectSkinResponse,
   AcceptReadyCheckResponse,
-    ErrorResponse,
-    FavoritesResponse,
-    ToggleFavoriteRequest,
-    ToggleFavoriteResponse
+  ErrorResponse,
+  FavoritesResponse,
+  ToggleFavoriteRequest,
+  ToggleFavoriteResponse,
+  NetworkInterfacesResponse,
+  NetworkInterface
 } from '../shared/api-types';
 
 interface PortableUpdateInfo {
@@ -168,6 +170,9 @@ class SkinSelectorUI {
     private showFavoritesOnly: boolean = false;
     private keyboardShortcutsEnabled: boolean = true;
     private displayedSkinCards: HTMLElement[] = [];
+    private networkInterfaces: NetworkInterface[] = [];
+    private selectedNetworkIp: string = '';
+    private advancedModeOpen: boolean = false;
 
     constructor() {
         this.init();
@@ -301,7 +306,7 @@ class SkinSelectorUI {
                     toggleQrBtn.classList.toggle('active', isOpen);
                     toggleQrBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
                     if (isOpen && !this.qrGenerated) {
-                        this.generateQRCode();
+                        void this.generateQRCode();
                     }
                 });
 
@@ -315,6 +320,33 @@ class SkinSelectorUI {
                         toggleQrBtn.setAttribute('aria-expanded', 'false');
                     }
                 });
+
+                // Advanced mode toggle
+                const advancedToggle = document.getElementById('advancedModeToggle') as HTMLButtonElement | null;
+                const advancedPanel = document.getElementById('advancedModePanel');
+                if (advancedToggle && advancedPanel) {
+                    advancedToggle.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        this.advancedModeOpen = !this.advancedModeOpen;
+                        if (this.advancedModeOpen) {
+                            advancedPanel.classList.remove('hidden');
+                            void this.loadNetworkInterfaces();
+                        } else {
+                            advancedPanel.classList.add('hidden');
+                        }
+                    });
+                }
+
+                // Network interface selection
+                const networkSelect = document.getElementById('networkSelect') as HTMLSelectElement | null;
+                if (networkSelect) {
+                    networkSelect.addEventListener('change', (event) => {
+                        const target = event.target as HTMLSelectElement;
+                        this.selectedNetworkIp = target.value;
+                        this.qrGenerated = false;
+                        void this.generateQRCode();
+                    });
+                }
             }
         }
     }
@@ -1002,12 +1034,69 @@ class SkinSelectorUI {
         });
     }
 
+    private async loadNetworkInterfaces(): Promise<void> {
+        try {
+            const response = await fetch('/api/network-interfaces');
+            const data = await response.json() as NetworkInterfacesResponse | ErrorResponse;
+
+            if ('error' in data) {
+                this.log(`Failed to load network interfaces: ${data.error}`, 'error');
+                return;
+            }
+
+            this.networkInterfaces = data.interfaces;
+            this.selectedNetworkIp = data.preferredIp;
+            this.updateNetworkSelect();
+        } catch (error) {
+            console.error('Error loading network interfaces:', error);
+            this.log('Failed to load network interfaces', 'error');
+        }
+    }
+
+    private updateNetworkSelect(): void {
+        const networkSelect = document.getElementById('networkSelect') as HTMLSelectElement | null;
+        if (!networkSelect) return;
+
+        // Clear existing options except the first (auto-select)
+        while (networkSelect.options.length > 1) {
+            networkSelect.remove(1);
+        }
+
+        // Add all network interfaces as options
+        for (const iface of this.networkInterfaces) {
+            const option = document.createElement('option');
+            option.value = iface.ip;
+            
+            let label = iface.ip;
+            if (iface.interfaceName) {
+                label += ` (${iface.interfaceName})`;
+            }
+            if (iface.type === 'vpn') {
+                label += ' [VPN]';
+            }
+            
+            option.textContent = label;
+            networkSelect.appendChild(option);
+        }
+
+        // Set selected value
+        if (this.selectedNetworkIp) {
+            networkSelect.value = this.selectedNetworkIp;
+        }
+    }
+
     private generateQRCode(): void {
         const canvas = document.getElementById('qrCanvas') as HTMLCanvasElement | null;
         if (!canvas) return;
 
+        // Build the API URL with selected IP if available
+        let qrUrl = '/api/qr-code';
+        if (this.selectedNetworkIp) {
+            qrUrl += `?ip=${encodeURIComponent(this.selectedNetworkIp)}`;
+        }
+
         // Fetch the QR code image from the server
-        fetch('/api/qr-code')
+        fetch(qrUrl)
             .then(response => response.json() as Promise<QRCodeResponse | ErrorResponse>)
             .then(data => {
                 if ('error' in data) {

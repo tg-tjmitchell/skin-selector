@@ -19,7 +19,9 @@ import type {
   ErrorResponse,
   FavoritesResponse,
   ToggleFavoriteRequest,
-  ToggleFavoriteResponse
+  ToggleFavoriteResponse,
+  NetworkInterfacesResponse,
+  NetworkInterface
 } from "../shared/api-types";
 
 const DEFAULT_PORT = 3000;
@@ -71,12 +73,26 @@ export class SkinSelectorServer {
       return res.json({ lanIp, port, url });
     });
 
-    // Generate QR code
-    this.app.get("/api/qr-code", async (_req: Request, res: Response<QRCodeResponse | ErrorResponse>) => {
+    // Get available network interfaces
+    this.app.get("/api/network-interfaces", (_req: Request, res: Response<NetworkInterfacesResponse | ErrorResponse>) => {
       try {
-        const lanIp = this.getLanIp();
+        const interfaces = this.getNetworkInterfaceCandidates();
+        const preferredIp = this.getLanIp();
         const port = (this.server?.address() as AddressInfo)?.port || DEFAULT_PORT;
-        const url = `http://${lanIp}:${port}`;
+        return res.json({ interfaces, preferredIp, port });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
+    // Generate QR code
+    this.app.get("/api/qr-code", async (req: Request, res: Response<QRCodeResponse | ErrorResponse>) => {
+      try {
+        // Allow user-selected IP via query parameter, otherwise use preferred
+        const selectedIp = (req.query.ip as string) || this.getLanIp();
+        const port = (this.server?.address() as AddressInfo)?.port || DEFAULT_PORT;
+        const url = `http://${selectedIp}:${port}`;
         const qrImage = await QRCode.toDataURL(url, {
           errorCorrectionLevel: "H",
           type: "image/png",
@@ -247,10 +263,10 @@ export class SkinSelectorServer {
     });
   }
 
-  private getLanIp(): string {
+  private getNetworkInterfaceCandidates(): NetworkInterface[] {
     const interfaces = os.networkInterfaces();
+    const candidates: NetworkInterface[] = [];
     
-    // Prioritize physical network interfaces over VPN/virtual adapters
     const physicalPatterns = [
       /^eth/i,      // Ethernet
       /^en\d/i,     // macOS en0, en1, etc.
@@ -259,7 +275,6 @@ export class SkinSelectorServer {
       /^ethernet/i, // Explicit ethernet name
     ];
     
-    // VPN/virtual adapter patterns to skip
     const vpnPatterns = [
       /^tap/i,
       /^tun/i,
@@ -274,50 +289,54 @@ export class SkinSelectorServer {
       /veth/i,
     ];
     
-    // First pass: look for physical interfaces matching preferred patterns
-    for (const pattern of physicalPatterns) {
-      for (const name of Object.keys(interfaces)) {
-        if (!pattern.test(name)) continue;
-        const iface = interfaces[name];
-        if (!iface) continue;
+    // Collect all non-internal IPv4 addresses
+    for (const name of Object.keys(interfaces)) {
+      const iface = interfaces[name];
+      if (!iface) continue;
+      
+      for (const addr of iface) {
+        if (addr.family !== "IPv4" || addr.internal) continue;
         
-        for (const addr of iface) {
-          if (addr.family === "IPv4" && !addr.internal) {
-            return addr.address;
-          }
+        // Determine interface type
+        let type: 'physical' | 'vpn' | 'other' = 'other';
+        let isPreferred = false;
+        
+        if (physicalPatterns.some(pattern => pattern.test(name))) {
+          type = 'physical';
+          isPreferred = true;
+        } else if (vpnPatterns.some(pattern => pattern.test(name))) {
+          type = 'vpn';
         }
+        
+        candidates.push({
+          ip: addr.address,
+          interfaceName: name,
+          isPreferred,
+          type
+        });
       }
     }
     
-    // Second pass: look for any non-internal IPv4 address, excluding known VPN adapters
-    for (const name of Object.keys(interfaces)) {
-      // Skip VPN/virtual adapters
-      if (vpnPatterns.some(pattern => pattern.test(name))) continue;
-      
-      const iface = interfaces[name];
-      if (!iface) continue;
-      
-      for (const addr of iface) {
-        if (addr.family === "IPv4" && !addr.internal) {
-          return addr.address;
-        }
-      }
+    // Sort: physical interfaces first, then others, then VPN
+    candidates.sort((a, b) => {
+      const typeOrder = { physical: 0, other: 1, vpn: 2 };
+      return typeOrder[a.type] - typeOrder[b.type];
+    });
+    
+    return candidates;
+  }
+
+  private getLanIp(): string {
+    const candidates = this.getNetworkInterfaceCandidates();
+    
+    if (candidates.length === 0) {
+      this.logger.error("No external network interface found");
+      throw new Error("Unable to determine LAN IP address");
     }
     
-    // Final fallback: return any non-internal IPv4 address (including VPN if necessary)
-    for (const name of Object.keys(interfaces)) {
-      const iface = interfaces[name];
-      if (!iface) continue;
-      
-      for (const addr of iface) {
-        if (addr.family === "IPv4" && !addr.internal) {
-          return addr.address;
-        }
-      }
-    }
-    
-    this.logger.error("No external network interface found");
-    throw new Error("Unable to determine LAN IP address");
+    // Return the first candidate (which will be physical if available)
+     
+    return candidates[0]!.ip;
   }
 
   private getFavoritesPath(): string {
