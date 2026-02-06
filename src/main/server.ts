@@ -249,17 +249,75 @@ export class SkinSelectorServer {
 
   private getLanIp(): string {
     const interfaces = os.networkInterfaces();
+    
+    // Prioritize physical network interfaces over VPN/virtual adapters
+    const physicalPatterns = [
+      /^eth/i,      // Ethernet
+      /^en\d/i,     // macOS en0, en1, etc.
+      /^wlan/i,     // WiFi
+      /^wifi/i,     // WiFi alternative
+      /^ethernet/i, // Explicit ethernet name
+    ];
+    
+    // VPN/virtual adapter patterns to skip
+    const vpnPatterns = [
+      /^tap/i,
+      /^tun/i,
+      /openvpn/i,
+      /wireguard/i,
+      /vpn/i,
+      /cisco/i,
+      /anyconnect/i,
+      /hamachi/i,
+      /docker/i,
+      /vboxnet/i,
+      /veth/i,
+    ];
+    
+    // First pass: look for physical interfaces matching preferred patterns
+    for (const pattern of physicalPatterns) {
+      for (const name of Object.keys(interfaces)) {
+        if (!pattern.test(name)) continue;
+        const iface = interfaces[name];
+        if (!iface) continue;
+        
+        for (const addr of iface) {
+          if (addr.family === "IPv4" && !addr.internal) {
+            return addr.address;
+          }
+        }
+      }
+    }
+    
+    // Second pass: look for any non-internal IPv4 address, excluding known VPN adapters
     for (const name of Object.keys(interfaces)) {
+      // Skip VPN/virtual adapters
+      if (vpnPatterns.some(pattern => pattern.test(name))) continue;
+      
       const iface = interfaces[name];
       if (!iface) continue;
-
+      
       for (const addr of iface) {
         if (addr.family === "IPv4" && !addr.internal) {
           return addr.address;
         }
       }
     }
-    return "localhost";
+    
+    // Final fallback: return any non-internal IPv4 address (including VPN if necessary)
+    for (const name of Object.keys(interfaces)) {
+      const iface = interfaces[name];
+      if (!iface) continue;
+      
+      for (const addr of iface) {
+        if (addr.family === "IPv4" && !addr.internal) {
+          return addr.address;
+        }
+      }
+    }
+    
+    this.logger.error("No external network interface found");
+    throw new Error("Unable to determine LAN IP address");
   }
 
   private getFavoritesPath(): string {
