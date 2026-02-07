@@ -75,6 +75,19 @@ interface DOMElements {
 
 type LogType = 'info' | 'success' | 'warning' | 'error';
 
+// Key mapping for keyboard shortcuts: supports up to 26 skins
+const KEYBOARD_SHORTCUTS: string[] = [
+    '1', '2', '3', '4', '5', '6', '7', '8', '9', // Positions 0-8
+    '0',                                          // Position 9
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I',      // Positions 10-17
+    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'       // Positions 18-25
+];
+
+// Reverse mapping: key -> position (for quick lookup)
+const KEY_TO_POSITION: Map<string, number> = new Map(
+    KEYBOARD_SHORTCUTS.map((key, index) => [key.toLowerCase(), index])
+);
+
 class FavoritesManager {
     private static favorites: Map<number, Set<number>> = new Map();
 
@@ -484,12 +497,19 @@ class SkinSelectorUI {
                 return;
             }
 
-            const key = parseInt(e.key, 10);
+            const key = e.key.toLowerCase();
+            const position = KEY_TO_POSITION.get(key);
             
-            // Check if key is a number 1-9
-            if (!isNaN(key) && key >= 1 && key <= 9) {
+            // Check if this key is mapped to a position
+            if (position !== undefined) {
                 e.preventDefault();
-                this.selectSkinByKeyboardShortcut(key);
+                
+                // If we're in chroma view, select chroma; otherwise select skin
+                if (this.selectedSkin && this.elements.chromaSelectionArea?.style.display !== 'none') {
+                    this.selectChromaByKeyboardShortcut(position + 1);
+                } else {
+                    this.selectSkinByKeyboardShortcut(position + 1);
+                }
             }
         });
     }
@@ -511,7 +531,8 @@ class SkinSelectorUI {
         if (selectedSkin) {
             if (selectedSkin.hasOwnedChromas) {
                 this.showChromaSelection(selectedSkin);
-                this.log(`Opened chromas for ${selectedSkin.name} (Press 1-9 to select chroma)`, 'info');
+                const keyHint = KEYBOARD_SHORTCUTS.slice(0, Math.min((selectedSkin.chromas?.length || 0) + 1, KEYBOARD_SHORTCUTS.length)).join(', ');
+                this.log(`Opened chromas for ${selectedSkin.name} (Press ${keyHint} to select)`, 'info');
             } else {
                 this.selectSkin(selectedSkin.id, selectedSkin.name);
             }
@@ -882,11 +903,13 @@ class SkinSelectorUI {
             skinCard.appendChild(img);
             skinCard.appendChild(infoDiv);
             
-            // Add keyboard shortcut number badge
-            const shortcutBadge = document.createElement('div');
-            shortcutBadge.className = 'keyboard-shortcut-badge';
-            shortcutBadge.textContent = (index + 1).toString();
-            skinCard.appendChild(shortcutBadge);
+            // Add keyboard shortcut badge if there's a mapped key for this position
+            if (index < KEYBOARD_SHORTCUTS.length) {
+                const shortcutBadge = document.createElement('div');
+                shortcutBadge.className = 'keyboard-shortcut-badge';
+                shortcutBadge.textContent = KEYBOARD_SHORTCUTS[index];
+                skinCard.appendChild(shortcutBadge);
+            }
             
             // Add preview button in corner
             const previewBtn = document.createElement('button');
@@ -1046,6 +1069,7 @@ class SkinSelectorUI {
         if (!this.elements.chromaGrid) return;
         
         this.elements.chromaGrid.innerHTML = '';
+        let chromaIndex = 0;
 
         // Add base skin option
         const baseSkinCard = document.createElement('div');
@@ -1069,6 +1093,16 @@ class SkinSelectorUI {
 
         baseSkinCard.appendChild(baseImg);
         baseSkinCard.appendChild(baseInfo);
+        
+        // Add keyboard shortcut badge for base skin
+        if (chromaIndex < KEYBOARD_SHORTCUTS.length) {
+            const shortcutBadge = document.createElement('div');
+            shortcutBadge.className = 'keyboard-shortcut-badge';
+            shortcutBadge.textContent = KEYBOARD_SHORTCUTS[chromaIndex];
+            baseSkinCard.appendChild(shortcutBadge);
+        }
+        chromaIndex++;
+        
         baseSkinCard.addEventListener('click', () => {
             this.selectSkin(skin.id, skin.name);
             this.showSkinSelection();
@@ -1100,12 +1134,48 @@ class SkinSelectorUI {
 
                 chromaCard.appendChild(img);
                 chromaCard.appendChild(infoDiv);
+                
+                // Add keyboard shortcut badge
+                if (chromaIndex < KEYBOARD_SHORTCUTS.length) {
+                    const shortcutBadge = document.createElement('div');
+                    shortcutBadge.className = 'keyboard-shortcut-badge';
+                    shortcutBadge.textContent = KEYBOARD_SHORTCUTS[chromaIndex];
+                    chromaCard.appendChild(shortcutBadge);
+                }
+                chromaIndex++;
+                
                 chromaCard.addEventListener('click', () => {
                     this.selectSkin(skin.id, skin.name, chroma.id);
                     this.showSkinSelection();
                 });
                 this.elements.chromaGrid.appendChild(chromaCard);
             });
+        }
+    }
+
+    private selectChromaByKeyboardShortcut(position: number): void {
+        if (!this.selectedSkin) return;
+        
+        // Position 1 = base skin
+        if (position === 1) {
+            this.selectSkin(this.selectedSkin.id, this.selectedSkin.name);
+            this.showSkinSelection();
+            return;
+        }
+        
+        // Position 2+ = chromas
+        const chromas = this.selectedSkin.chromas || [];
+        const chromaIndex = position - 2; // -1 for 0-based, -1 for base skin offset
+        
+        if (chromaIndex >= chromas.length) {
+            this.log(`Only ${chromas.length + 1} options available (base + chromas)`, 'warning');
+            return;
+        }
+        
+        const chroma = chromas[chromaIndex];
+        if (chroma) {
+            this.selectSkin(this.selectedSkin.id, this.selectedSkin.name, chroma.id);
+            this.showSkinSelection();
         }
     }
 
