@@ -14,23 +14,28 @@
                 <p class="subtitle">Automatically select your favorite skins in champion select</p>
             </div>
             <div class="header-actions">
-                <span class="header-action-label">Open on phone</span>
-                <button class="icon-btn" id="toggleQrBtn" aria-label="Open on phone" aria-expanded="false" title="Open on phone">📱</button>
-                <div class="qr-popover hidden" id="qrContainer">
-                    <div class="qr-popover-title">
-                        Open on Phone
-                        <button id="advancedModeToggle" class="advanced-toggle" title="Show network options">⚙️</button>
-                    </div>
-                    <canvas id="qrCanvas" style="max-width: 240px; width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px;"></canvas>
-                    <p class="qr-hint">Scan with your phone to access this page</p>
-                    <div class="advanced-mode hidden" id="advancedModePanel">
-                        <div class="network-selector">
-                            <label for="networkSelect">Select Network:</label>
-                            <select id="networkSelect">
-                                <option value="">Auto-select preferred</option>
-                            </select>
+                <div class="header-actions-left">
+                    <button class="icon-btn" id="toggleQrBtn" aria-label="Open on phone" aria-expanded="false" title="Open on phone">📱</button>
+                    <span class="header-action-label" id="qrHeaderLabel">← Open on phone</span>
+                    <div class="qr-popover hidden" id="qrContainer">
+                        <div class="qr-popover-title">
+                            Open on Phone
+                            <button id="advancedModeToggle" class="advanced-toggle" title="Show network options">⚙️</button>
+                        </div>
+                        <canvas id="qrCanvas" style="max-width: 240px; width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px;"></canvas>
+                        <p class="qr-hint">Scan with your phone to access this page</p>
+                        <div class="advanced-mode hidden" id="advancedModePanel">
+                            <div class="network-selector">
+                                <label for="networkSelect">Select Network:</label>
+                                <select id="networkSelect">
+                                    <option value="">Auto-select preferred</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
+                </div>
+                <div class="header-actions-right">
+                    <button class="icon-btn" id="settingsToggleBtn" aria-label="Open settings" aria-expanded="false" title="Settings">⚙️</button>
                 </div>
             </div>
         </div>
@@ -123,6 +128,49 @@
                     <div class="log-container" id="logContainer">
                         <p class="log-entry">Initialized. Waiting for League Client...</p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-overlay" id="settingsOverlay"></div>
+    <div class="settings-drawer" id="settingsDrawer" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true">
+        <div class="settings-drawer-header">
+            <h2>Settings</h2>
+            <button class="icon-btn settings-close-btn" id="settingsCloseBtn" aria-label="Close settings" title="Close">X</button>
+        </div>
+        <div class="settings-drawer-content">
+            <div class="settings-group">
+                <div class="settings-group-title">Queue popups</div>
+                <div class="setting-row">
+                    <div class="setting-text">
+                        <div class="setting-title">Enable focus helpers</div>
+                        <div class="setting-desc">Allow popups to bring the app to the front.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="queuePopupFocusToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row sub-setting">
+                    <div class="setting-text">
+                        <div class="setting-title">Focus on ready check</div>
+                        <div class="setting-desc">Bring the window forward when a ready check appears.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="queuePopupFocusReadyCheckToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row sub-setting">
+                    <div class="setting-text">
+                        <div class="setting-title">Focus on lock-in with skins</div>
+                        <div class="setting-desc">Bring the window forward when you lock in and have skins.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="queuePopupFocusLockInToggle">
+                        <span class="slider"></span>
+                    </label>
                 </div>
             </div>
         </div>

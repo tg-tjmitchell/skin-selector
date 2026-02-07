@@ -59,6 +59,13 @@ interface DOMElements {
     autoSelectBtn: HTMLButtonElement;
     refreshBtn: HTMLButtonElement;
     autoPickToggle: HTMLInputElement;
+    queuePopupFocusToggle: HTMLInputElement;
+    queuePopupFocusReadyCheckToggle: HTMLInputElement;
+    queuePopupFocusLockInToggle: HTMLInputElement;
+    settingsToggleBtn: HTMLButtonElement;
+    settingsCloseBtn: HTMLButtonElement;
+    settingsOverlay: HTMLElement;
+    settingsDrawer: HTMLElement;
     logContainer: HTMLElement;
     showFavoritesBtn: HTMLButtonElement | null;
     previewModal: HTMLElement | null;
@@ -165,6 +172,9 @@ class SkinSelectorUI {
     private selectedSkin: SkinData | null = null;
     private lockedIn: boolean = false;
     private focusedChampionId: number | null = null;
+    private queuePopupFocusEnabled: boolean = true;
+    private queuePopupFocusReadyCheck: boolean = true;
+    private queuePopupFocusLockIn: boolean = true;
     private elements!: DOMElements;
     private qrGenerated: boolean = false;
     private showFavoritesOnly: boolean = false;
@@ -181,6 +191,9 @@ class SkinSelectorUI {
     private init(): void {
         this.cacheElements();
         this.hideQrForWeb();
+        this.loadSettingsDrawerState();
+        this.loadQueuePopupSettings();
+        this.updateQueuePopupSettingsUI();
         this.setupEventListeners();
         this.loadAutoPickState();
         this.loadFavoritesFilterState();
@@ -199,10 +212,12 @@ class SkinSelectorUI {
 
     private hideQrForWeb(): void {
         if (this.isElectronApp()) return;
-        const headerActions = document.querySelector('.header-actions');
-        if (headerActions) {
-            headerActions.remove();
-        }
+        const qrLabel = document.getElementById('qrHeaderLabel');
+        const toggleQrBtn = document.getElementById('toggleQrBtn');
+        const qrContainer = document.getElementById('qrContainer');
+        qrLabel?.remove();
+        toggleQrBtn?.remove();
+        qrContainer?.remove();
     }
 
     private async loadFavorites(): Promise<void> {
@@ -234,12 +249,86 @@ class SkinSelectorUI {
             autoSelectBtn: this.getElement('autoSelectBtn') as HTMLButtonElement,
             refreshBtn: this.getElement('refreshBtn') as HTMLButtonElement,
             autoPickToggle: this.getElement('autoPickToggle') as HTMLInputElement,
+            queuePopupFocusToggle: this.getElement('queuePopupFocusToggle') as HTMLInputElement,
+            queuePopupFocusReadyCheckToggle: this.getElement('queuePopupFocusReadyCheckToggle') as HTMLInputElement,
+            queuePopupFocusLockInToggle: this.getElement('queuePopupFocusLockInToggle') as HTMLInputElement,
+            settingsToggleBtn: this.getElement('settingsToggleBtn') as HTMLButtonElement,
+            settingsCloseBtn: this.getElement('settingsCloseBtn') as HTMLButtonElement,
+            settingsOverlay: this.getElement('settingsOverlay'),
+            settingsDrawer: this.getElement('settingsDrawer'),
             logContainer: this.getElement('logContainer'),
             showFavoritesBtn: document.getElementById('showFavoritesBtn') as HTMLButtonElement | null,
             previewModal: document.getElementById('skinPreviewModal'),
             previewImage: document.getElementById('previewImage') as HTMLImageElement | null,
             previewClose: document.getElementById('previewClose')
         };
+    }
+
+    private loadSettingsDrawerState(): void {
+        const saved = localStorage.getItem('settingsDrawerOpen');
+        if (saved === 'true') {
+            this.openSettingsDrawer();
+        }
+    }
+
+    private openSettingsDrawer(): void {
+        this.elements.settingsDrawer.classList.add('open');
+        this.elements.settingsOverlay.classList.add('is-visible');
+        this.elements.settingsToggleBtn.setAttribute('aria-expanded', 'true');
+        this.elements.settingsDrawer.setAttribute('aria-hidden', 'false');
+        localStorage.setItem('settingsDrawerOpen', 'true');
+    }
+
+    private closeSettingsDrawer(): void {
+        this.elements.settingsDrawer.classList.remove('open');
+        this.elements.settingsOverlay.classList.remove('is-visible');
+        this.elements.settingsToggleBtn.setAttribute('aria-expanded', 'false');
+        this.elements.settingsDrawer.setAttribute('aria-hidden', 'true');
+        localStorage.setItem('settingsDrawerOpen', 'false');
+    }
+
+    private toggleSettingsDrawer(): void {
+        if (this.elements.settingsDrawer.classList.contains('open')) {
+            this.closeSettingsDrawer();
+        } else {
+            this.openSettingsDrawer();
+        }
+    }
+
+    private loadQueuePopupSettings(): void {
+        const enabled = localStorage.getItem('queuePopupFocusEnabled');
+        if (enabled !== null) {
+            this.queuePopupFocusEnabled = enabled === 'true';
+        }
+
+        const readyCheck = localStorage.getItem('queuePopupFocusReadyCheck');
+        if (readyCheck !== null) {
+            this.queuePopupFocusReadyCheck = readyCheck === 'true';
+        }
+
+        const lockIn = localStorage.getItem('queuePopupFocusLockIn');
+        if (lockIn !== null) {
+            this.queuePopupFocusLockIn = lockIn === 'true';
+        }
+
+        this.elements.queuePopupFocusToggle.checked = this.queuePopupFocusEnabled;
+        this.elements.queuePopupFocusReadyCheckToggle.checked = this.queuePopupFocusReadyCheck;
+        this.elements.queuePopupFocusLockInToggle.checked = this.queuePopupFocusLockIn;
+    }
+
+    private updateQueuePopupSettingsUI(): void {
+        const subToggles = [
+            this.elements.queuePopupFocusReadyCheckToggle,
+            this.elements.queuePopupFocusLockInToggle
+        ];
+
+        subToggles.forEach((toggle) => {
+            toggle.disabled = !this.queuePopupFocusEnabled;
+            const row = toggle.closest('.setting-row');
+            if (row) {
+                row.classList.toggle('is-disabled', !this.queuePopupFocusEnabled);
+            }
+        });
     }
 
     private getElement<T extends HTMLElement>(id: string): T {
@@ -269,6 +358,10 @@ class SkinSelectorUI {
         this.elements.autoSelectBtn.addEventListener('click', () => this.autoSelectRandomSkin());
         this.elements.refreshBtn.addEventListener('click', () => this.refreshSkins());
 
+        this.elements.settingsToggleBtn.addEventListener('click', () => this.toggleSettingsDrawer());
+        this.elements.settingsCloseBtn.addEventListener('click', () => this.closeSettingsDrawer());
+        this.elements.settingsOverlay.addEventListener('click', () => this.closeSettingsDrawer());
+
         if (this.elements.acceptQueueBtn) {
             this.elements.acceptQueueBtn.addEventListener('click', () => this.acceptReadyCheck());
         }
@@ -281,6 +374,37 @@ class SkinSelectorUI {
             this.favoritesOnlyMode = this.elements.autoPickToggle.checked;
             localStorage.setItem('favoritesOnlyMode', this.favoritesOnlyMode.toString());
             this.log(this.favoritesOnlyMode ? 'Favorites-only mode enabled' : 'Favorites-only mode disabled', 'info');
+        });
+
+        this.elements.queuePopupFocusToggle.addEventListener('change', () => {
+            this.queuePopupFocusEnabled = this.elements.queuePopupFocusToggle.checked;
+            localStorage.setItem('queuePopupFocusEnabled', this.queuePopupFocusEnabled.toString());
+            this.updateQueuePopupSettingsUI();
+            this.log(this.queuePopupFocusEnabled ? 'Queue popup focus enabled' : 'Queue popup focus disabled', 'info');
+        });
+
+        this.elements.queuePopupFocusReadyCheckToggle.addEventListener('change', () => {
+            this.queuePopupFocusReadyCheck = this.elements.queuePopupFocusReadyCheckToggle.checked;
+            localStorage.setItem('queuePopupFocusReadyCheck', this.queuePopupFocusReadyCheck.toString());
+            this.log(
+                this.queuePopupFocusReadyCheck ? 'Ready check focus enabled' : 'Ready check focus disabled',
+                'info'
+            );
+        });
+
+        this.elements.queuePopupFocusLockInToggle.addEventListener('change', () => {
+            this.queuePopupFocusLockIn = this.elements.queuePopupFocusLockInToggle.checked;
+            localStorage.setItem('queuePopupFocusLockIn', this.queuePopupFocusLockIn.toString());
+            this.log(
+                this.queuePopupFocusLockIn ? 'Lock-in focus enabled' : 'Lock-in focus disabled',
+                'info'
+            );
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.elements.settingsDrawer.classList.contains('open')) {
+                this.closeSettingsDrawer();
+            }
         });
 
         // Favorites filter toggle
@@ -494,7 +618,7 @@ class SkinSelectorUI {
                         await this.refreshSkins();
                     }
                     if (this.currentSkins.length > 0 && this.hasNonBaseSkins() && this.focusedChampionId !== this.currentChampionId) {
-                        this.requestWindowFocus();
+                        this.requestWindowFocus('lockIn');
                         this.focusedChampionId = this.currentChampionId;
                     }
                 }
@@ -520,7 +644,7 @@ class SkinSelectorUI {
                     } else {
                         this.elements.readyCheckPopup.classList.remove('hidden');
                         this.elements.acceptQueueBtn.disabled = false;
-                        this.requestWindowFocus();
+                        this.requestWindowFocus('readyCheck');
                     }
                 } else {
                     this.elements.readyCheckPopup.classList.add('hidden');
@@ -597,12 +721,21 @@ class SkinSelectorUI {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    private requestWindowFocus(): void {
+    private requestWindowFocus(reason: 'readyCheck' | 'lockIn'): void {
+        if (!this.shouldFocusQueuePopup(reason)) return;
         const win = window as WindowWithExtensions;
         if (win.electronAPI && typeof win.electronAPI.requestFocus === 'function') {
             win.electronAPI.requestFocus();
-            this.log('Window focused (locked-in with skins)', 'info');
+            const label = reason === 'readyCheck' ? 'ready check' : 'lock-in';
+            this.log(`Window focused (${label})`, 'info');
         }
+    }
+
+    private shouldFocusQueuePopup(reason: 'readyCheck' | 'lockIn'): boolean {
+        if (!this.queuePopupFocusEnabled) return false;
+        return reason === 'readyCheck'
+            ? this.queuePopupFocusReadyCheck
+            : this.queuePopupFocusLockIn;
     }
 
     private hasNonBaseSkins(): boolean {
