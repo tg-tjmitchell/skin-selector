@@ -55,12 +55,70 @@
 - **Test HTML closing tags** in `index.html`—previous bugs found with mismatched `</div>`
 - **Avoid dynamic `require()`** in `server.ts`—use static ES6 imports at the top
 
+## Code Documentation Standards
+
+### JSDoc Comments
+All TypeScript files should use **JSDoc-style block comments** (`/** */`) for documentation. This improves IDE IntelliSense, enables auto-generated docs, and makes code more maintainable.
+
+**Classes & Interfaces:**
+```typescript
+/**
+ * Manages user-favorited skins. Provides methods for loading, checking,
+ * and toggling favorite status. Favorites are persisted on the server.
+ */
+class FavoritesManager {
+  // ...
+}
+
+/**
+ * Type definition for portable update information.
+ */
+interface PortableUpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  downloadUrl: string;
+}
+```
+
+**Public Methods & Functions:**
+```typescript
+/**
+ * Check if we have an active connection to the League Client.
+ * Uses a combination of the client's internal state and a test request.
+ */
+async isConnected(): Promise<boolean> {
+  // ...
+}
+
+/**
+ * Generate a QR code for the current server URL.
+ * Allows user to specify a custom IP via query parameter.
+ */
+app.get("/api/qr-code", async (req, res) => {
+  // ...
+});
+```
+
+**Inline Comments:**
+- Use `//` for brief explanations of **why** code does something (not what it does)
+- Remove obvious comments that just restate the code
+- Keep inline comments minimal; let clear code speak for itself
+- Prefix unused catch parameters with underscore: `catch (_error) { }`
+
+**Comment Quality:**
+- ✅ **Good**: `// HasagiClient auto-disconnects when the process exits`
+- ❌ **Bad**: `// Get the current summoner` (obvious from function name)
+- ✅ **Good**: `// Prevents race condition where user launches app before update installs`
+- ❌ **Bad**: `// Set connection state to false` (restates the code)
+
 ## Anti-Patterns to Avoid
 - Don't use webpack/vite for renderer—only esbuild (single-file bundle)
 - Don't add React/Vue—vanilla JS only for renderer
 - Don't call LCU directly from renderer code—route through Express API endpoints
 - Don't modify `package.json` scripts without understanding the three-layer build process
 - Don't expose sensitive `electronAPI` methods (like unchecked file system access) in preload
+- Don't use inline `//` comments that just restate the code—use JSDoc blocks for documentation
+- Don't forget to document public methods, classes, and interfaces with JSDoc blocks
 
 ## Common Workflows
 

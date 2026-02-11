@@ -1,11 +1,19 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+/**
+ * Type definition for portable update information.
+ */
 interface PortableUpdateInfo {
   currentVersion: string;
   latestVersion: string;
   downloadUrl: string;
 }
 
+/**
+ * Expose safe IPC methods to the renderer process via the electronAPI global.
+ * Provides window management, app info, and update notifications through
+ * isolated context bridge to prevent XSS attacks.
+ */
 contextBridge.exposeInMainWorld("electronAPI", {
   requestFocus: () => ipcRenderer.send("focus-window"),
   openReleasesPage: () => ipcRenderer.send("open-releases-page"),

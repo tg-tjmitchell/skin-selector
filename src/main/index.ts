@@ -2,17 +2,20 @@ import { SkinSelectorServer, type ServerConfig, type ServerState } from "./serve
 
 export type { ServerConfig, ServerState };
 
-// Create and export server instance
+/**
+ * Create and start the server instance.
+ */
 export function startServer(options: ServerConfig = {}): Promise<ServerState> {
   const isDevelopment = process.env.NODE_ENV === "development";
   serverInstance = new SkinSelectorServer(isDevelopment);
   return serverInstance.start(options);
 }
 
-// Store server instance for cleanup
 let serverInstance: SkinSelectorServer | null = null;
 
-// Handle graceful shutdown
+/**
+ * Handle graceful shutdown of the server with resource cleanup.
+ */
 const shutdown = async (signal: string) => {
   console.log(`\n\n${signal} received. Shutting down gracefully...`);
   

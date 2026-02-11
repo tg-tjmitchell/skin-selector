@@ -111,12 +111,10 @@ class LCUConnector {
     this.client.on("disconnected", () => {
       console.log("Disconnected from League Client");
       this.lastConnectionState = false;
-      // Start trying to reconnect
       this.startConnectionRetries();
     });
 
     this.client.on("connection-attempt-failed", () => {
-      // Connection attempt failed, will retry
       console.log("Connection attempt failed, will retry in 2 seconds...");
     });
   }
@@ -126,7 +124,7 @@ class LCUConnector {
    */
   private startConnectionRetries(): void {
     if (this.isAttemptingConnection) {
-      return; // Already attempting
+      return;
     }
 
     this.isAttemptingConnection = true;
@@ -139,10 +137,8 @@ class LCUConnector {
           connectionAttemptDelay: DEFAULT_RETRY_DELAY_MS,
           useWebSocket: true
         });
-        // If connection succeeds, the "connected" event will be fired
         this.isAttemptingConnection = false;
       } catch (error) {
-        // Failed to connect, will retry after delay
         console.log("Connection attempt failed:", getErrorMessage(error));
       }
     };
@@ -150,7 +146,6 @@ class LCUConnector {
     // Attempt connection immediately
     attemptConnection();
 
-    // Set up periodic retry attempts every 5 seconds
     if (this.connectionAttemptTimer) {
       clearInterval(this.connectionAttemptTimer);
     }
@@ -167,7 +162,6 @@ class LCUConnector {
    * Uses a combination of the client's internal state and a test request
    */
   async isConnected(): Promise<boolean> {
-    // First check if client claims to be connected
     if (!this.client.isConnected) {
       this.lastConnectionState = false;
       return false;
@@ -175,7 +169,6 @@ class LCUConnector {
 
     // Verify connection with a lightweight test request
     try {
-      // Use a short timeout for the test request
       const summoner = await Promise.race([
         this.client.request("get", "/lol-summoner/v1/current-summoner"),
         new Promise((_, reject) => 
@@ -188,7 +181,6 @@ class LCUConnector {
         return true;
       }
     } catch (_error) {
-      // Connection test failed - try to reconnect
       if (!this.isAttemptingConnection) {
         this.startConnectionRetries();
       }
@@ -252,16 +244,11 @@ class LCUConnector {
     
     // Stop all polling and reconnection attempts
     this.stopPolling();
-    
-    // Clear the reconnect callback
     this.reconnectCallback = null;
-    
-    // Update connection state
     this.lastConnectionState = false;
     
-    // Note: HasagiClient doesn't expose a disconnect method
-    // The client will disconnect automatically when the process exits
-    // We've cleaned up all our internal state and timers
+    // HasagiClient doesn't provide a disconnect method - it auto-disconnects
+    // when the process exits. We've cleaned up all timers and internal state above.
     
     console.log("LCU disconnected successfully");
   }

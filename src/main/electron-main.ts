@@ -10,6 +10,10 @@ let serverInfo: ServerState | null = null;
 
 const windowStateFile = path.join(app.getPath("userData"), "windowState.json");
 
+/**
+ * Retrieve saved window state (size and position) from persistent storage.
+ * Returns null if no saved state exists or if reading fails.
+ */
 function getWindowState(): { width: number; height: number; x: number; y: number } | null {
   try {
     if (fs.existsSync(windowStateFile)) {
@@ -21,6 +25,9 @@ function getWindowState(): { width: number; height: number; x: number; y: number
   return null;
 }
 
+/**
+ * Persist the current window state (size and position) to storage.
+ */
 function saveWindowState(): void {
   if (!mainWindow) return;
   const [width, height] = mainWindow.getSize();
@@ -33,6 +40,9 @@ function saveWindowState(): void {
   }
 }
 
+/**
+ * Create and initialize the application's main browser window.
+ */
 function createWindow(port: number): void {
   const savedState = getWindowState();
   const defaultWidth = 1100;
@@ -92,12 +102,11 @@ app.whenReady().then(async () => {
   serverInfo = await startServer({ port, isElectron: true });
   createWindow(serverInfo.port);
 
-  // Check if running portable version
   const isPortable = isPortableVersion();
   console.log(`Running as ${isPortable ? "portable" : "installed"} version`);
   
   if (isPortable) {
-    // Portable version: check GitHub releases manually
+    // Check GitHub releases manually for portable version
     console.log("Portable mode: using manual update check");
     checkForPortableUpdate()
       .then((updateInfo) => {
@@ -116,9 +125,10 @@ app.whenReady().then(async () => {
         console.log("Portable update check failed:", err.message);
       });
   } else {
-    // Installed version: use electron-updater for auto-updates
+    // Use electron-updater for installed versions
     autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = false; // Disable to avoid race conditions
+    // Manually control installation to prevent race conditions
+    autoUpdater.autoInstallOnAppQuit = false;
     
     autoUpdater.on("checking-for-update", () => {
       console.log("Checking for updates...");
@@ -152,11 +162,10 @@ app.whenReady().then(async () => {
         mainWindow.webContents.send("update-downloaded", info.version);
       }
       
-      // Install update immediately after download completes
-      // This prevents race condition where user launches app before update installs
+      // Install immediately after download to prevent user launching
+      // the app before update is installed (isSilent=true, isForceRunAfter=true)
       setTimeout(() => {
         console.log("Installing update and restarting...");
-        // isSilent=true to avoid installer UI, isForceRunAfter=true to auto-restart
         autoUpdater.quitAndInstall(true, true);
       }, 500);
     });
@@ -179,22 +188,17 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", (event) => {
-  // Prevent immediate quit to allow cleanup
+  // Prevent quitting immediately to allow cleanup of resources
   if (serverInfo) {
     event.preventDefault();
-    
-    // Save window state
     saveWindowState();
     
-    // Perform async cleanup
     (async () => {
       try {
-        // Disconnect from LCU
         if (serverInfo?.lcu) {
           await serverInfo.lcu.disconnect();
         }
         
-        // Close HTTP server
         if (serverInfo?.server) {
           await new Promise<void>((resolve) => {
             serverInfo!.server.close(() => {
@@ -206,13 +210,11 @@ app.on("before-quit", (event) => {
       } catch (error) {
         console.error("Error during shutdown:", error);
       } finally {
-        // Clear server info and quit for real
         serverInfo = null;
         app.quit();
       }
     })();
   } else {
-    // No cleanup needed, just save window state
     saveWindowState();
   }
 });

@@ -65,7 +65,9 @@ export class SkinSelectorServer {
   }
 
   private setupRoutes(): void {
-    // Get server info
+    /**
+     * Get server info including LAN IP and port
+     */
     this.app.get("/api/server-info", (_req: Request, res: Response<ServerInfoResponse>) => {
       const lanIp = this.getLanIp();
       const port = (this.server?.address() as AddressInfo)?.port || DEFAULT_PORT;
@@ -73,7 +75,9 @@ export class SkinSelectorServer {
       return res.json({ lanIp, port, url });
     });
 
-    // Get available network interfaces
+    /**
+     * Get available network interfaces with preference indicators
+     */
     this.app.get("/api/network-interfaces", (_req: Request, res: Response<NetworkInterfacesResponse | ErrorResponse>) => {
       try {
         const interfaces = this.getNetworkInterfaceCandidates();
@@ -86,10 +90,12 @@ export class SkinSelectorServer {
       }
     });
 
-    // Generate QR code
+    /**
+     * Generate a QR code for the current server URL.
+     * Allows user to specify a custom IP via query parameter.
+     */
     this.app.get("/api/qr-code", async (req: Request, res: Response<QRCodeResponse | ErrorResponse>) => {
       try {
-        // Allow user-selected IP via query parameter, otherwise use preferred
         const selectedIp = (req.query.ip as string) || this.getLanIp();
         const port = (this.server?.address() as AddressInfo)?.port || DEFAULT_PORT;
         const url = `http://${selectedIp}:${port}`;
@@ -106,7 +112,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Get status
+    /**
+     * Get connection status, summoner info, and champion select state
+     */
     this.app.get("/api/status", async (_req: Request, res: Response<StatusResponse | ErrorResponse>) => {
       try {
         if (!this.lcu) {
@@ -151,7 +159,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Get skins
+    /**
+     * Get available skins and chromas for a specific champion
+     */
     this.app.get("/api/skins/:championId", async (req: Request, res: Response<SkinsResponse | ErrorResponse>) => {
       try {
         if (!this.lcu || !(await this.lcu.isConnected())) {
@@ -172,7 +182,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Select skin
+    /**
+     * Set the player's selected skin and optional chroma in champion select
+     */
     this.app.post("/api/select-skin", async (req: Request, res: Response<SelectSkinResponse | ErrorResponse>) => {
       try {
         if (!this.lcu || !(await this.lcu.isConnected())) {
@@ -196,7 +208,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Get favorites
+    /**
+     * Get all user-favorited skins
+     */
     this.app.get("/api/favorites", async (_req: Request, res: Response<FavoritesResponse | ErrorResponse>) => {
       try {
         const favorites = await this.loadFavorites();
@@ -207,7 +221,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Toggle favorite
+    /**
+     * Toggle the favorite status of a skin
+     */
     this.app.post("/api/favorites/toggle", async (req: Request, res: Response<ToggleFavoriteResponse | ErrorResponse>) => {
       try {
         const { championId, skinId } = req.body as ToggleFavoriteRequest;
@@ -242,7 +258,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Accept ready check
+    /**
+     * Accept the ready check popup in the queue
+     */
     this.app.post("/api/accept-ready-check", async (_req: Request, res: Response<AcceptReadyCheckResponse | ErrorResponse>) => {
       try {
         if (!this.lcu || !(await this.lcu.isConnected())) {
@@ -257,7 +275,9 @@ export class SkinSelectorServer {
       }
     });
 
-    // Serve main page
+    /**
+     * Serve the main HTML application page
+     */
     this.app.get("/", (_req: Request, res: Response) => {
       res.sendFile(path.join(__dirname, "../renderer/index.html"));
     });
@@ -372,7 +392,7 @@ export class SkinSelectorServer {
       const parsed = JSON.parse(raw) as Record<string, number[]>;
       this.favoritesCache = parsed;
       return parsed;
-    } catch (error) {
+    } catch (_error) {
       this.favoritesCache = {};
       return this.favoritesCache;
     }

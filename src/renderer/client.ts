@@ -88,6 +88,10 @@ const KEY_TO_POSITION: Map<string, number> = new Map(
     KEYBOARD_SHORTCUTS.map((key, index) => [key.toLowerCase(), index])
 );
 
+/**
+ * Manages user-favorited skins. Provides methods for loading, checking,
+ * and toggling favorite status. Favorites are persisted on the server.
+ */
 class FavoritesManager {
     private static favorites: Map<number, Set<number>> = new Map();
 
@@ -99,6 +103,10 @@ class FavoritesManager {
         this.favorites = map;
     }
 
+    /**
+     * Load all favorites from the server.
+     * Returns true if successful, false otherwise.
+     */
     static async loadFavorites(): Promise<boolean> {
         try {
             const response = await fetch('/api/favorites');
@@ -178,6 +186,10 @@ class FavoritesManager {
     }
 }
 
+/**
+ * Main UI controller for the League Skin Selector.
+ * Manages DOM elements, handles user interactions, and orchestrates API calls.
+ */
 class SkinSelectorUI {
     private favoritesOnlyMode: boolean = false;
     private currentChampionId: number | null = null;

@@ -22,12 +22,11 @@ export function isPortableVersion(): boolean {
   const exePath = app.getPath("exe");
   const exeDir = path.dirname(exePath);
   
-  // NSIS installs to Program Files or AppData/Local/Programs
-  // Portable runs from wherever the user extracted it
+  // Installed versions reside in Program Files directories, portable versions don't
   const isInProgramFiles = exeDir.toLowerCase().includes("program files");
   const isInLocalPrograms = exeDir.toLowerCase().includes("local\\programs");
   
-  // Also check for NSIS uninstaller which only exists for installed versions
+  // NSIS installation creates an uninstaller file, portable versions don't
   const hasUninstaller = require("fs").existsSync(
     path.join(exeDir, "Uninstall League Skin Selector.exe")
   );
