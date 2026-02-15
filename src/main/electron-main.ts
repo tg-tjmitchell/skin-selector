@@ -78,6 +78,11 @@ function createWindow(port: number): void {
   });
 }
 
+/**
+ * Handle window focus requests. Restores the window from minimized state
+ * and brings it to the front temporarily to overcome focus prevention,
+ * then releases alwaysOnTop to allow users to click away to other windows.
+ */
 ipcMain.on("focus-window", () => {
   if (!mainWindow) return;
   if (mainWindow.isMinimized()) {
@@ -86,7 +91,12 @@ ipcMain.on("focus-window", () => {
   mainWindow.show();
   mainWindow.focus();
   mainWindow.setAlwaysOnTop(true);
-  mainWindow.setAlwaysOnTop(false);
+  // Release alwaysOnTop after a brief moment to avoid blocking other windows
+  setTimeout(() => {
+    if (mainWindow) {
+      mainWindow.setAlwaysOnTop(false);
+    }
+  }, 150);
 });
 
 ipcMain.on("open-releases-page", () => {
