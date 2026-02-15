@@ -19,6 +19,34 @@
   - `npm run build:renderer` - esbuild bundles `src/renderer/client.ts` to single IIFE for browser
   - `npm run copy:static` - Copies HTML/CSS to `dist/renderer/`
 
+### Release Process
+**Creating a new release is simple** - use `release-it` which automates versioning, changelog generation, and GitHub releases:
+
+- **Interactive Release**: `npm run release` (prompts for version bump, runs tests, creates changelog, tags, and pushes)
+- **Automated Releases**:
+  - `npm run release:patch` - Bump patch version (1.5.0 → 1.5.1) for bug fixes
+  - `npm run release:minor` - Bump minor version (1.5.0 → 1.6.0) for new features
+  - `npm run release:major` - Bump major version (1.5.0 → 2.0.0) for breaking changes
+- **Preview Changes**: `npm run release:dry` (dry-run mode, shows what would happen without making changes)
+
+**What happens during a release:**
+1. Runs linting and build to ensure code is valid
+2. Bumps version in `package.json`
+3. Updates `CHANGELOG.md` automatically from commit messages
+4. Creates git commit with message: `chore: release v{version}`
+5. Creates git tag: `v{version}`
+6. Pushes to GitHub (triggers `.github/workflows/release.yml`)
+7. GitHub Actions builds Windows installers and creates GitHub release with artifacts
+
+**Commit Message Convention** (for better changelogs):
+- `feat:` - New features (triggers minor version bump)
+- `fix:` - Bug fixes (triggers patch version bump)
+- `chore:` - Maintenance tasks (no version bump)
+- `docs:` - Documentation changes
+- `refactor:` - Code restructuring without feature changes
+
+**Important**: The release workflow requires a clean working directory. Commit or stash changes before releasing.
+
 ### Architecture Decisions
 - **No Module Bundler for Renderer**: Renderer uses esbuild (single IIFE bundle), NOT webpack/vite. If adding vendor deps to renderer, update the build step to include them in the esbuild config.
 - **TypeScript Configs**: Three tsconfigs serve different purposes—`tsconfig.json` compiles main process, `tsconfig.client.json` compiles renderer (browser environment), `tsconfig.base.json` shares common settings.
