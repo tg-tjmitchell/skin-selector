@@ -4,7 +4,7 @@
     "module": "commonjs",
     "outDir": "dist",
     "rootDir": "src",
-    "lib": ["ES2020", "DOM"]
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src/renderer/**/*.ts"]
 }

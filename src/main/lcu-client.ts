@@ -209,7 +209,7 @@ class LCUConnector {
       });
       return true;
     } catch (error) {
-      throw new Error(`Failed to connect to League Client: ${getErrorMessage(error)}`);
+      throw new Error(`Failed to connect to League Client: ${getErrorMessage(error)}`, { cause: error });
     }
   }
 
@@ -515,7 +515,7 @@ class LCUConnector {
 
       return true;
     } catch (error) {
-      throw new Error(`Failed to select skin: ${getErrorMessage(error)}`);
+      throw new Error(`Failed to select skin: ${getErrorMessage(error)}`, { cause: error });
     }
   }
 
@@ -549,7 +549,7 @@ class LCUConnector {
       await this.client.request("post", "/lol-matchmaking/v1/ready-check/accept");
       return true;
     } catch (error) {
-      throw new Error(`Failed to accept ready check: ${getErrorMessage(error)}`);
+      throw new Error(`Failed to accept ready check: ${getErrorMessage(error)}`, { cause: error });
     }
   }
 }
