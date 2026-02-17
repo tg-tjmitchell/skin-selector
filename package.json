@@ -37,7 +37,7 @@
     "qrcode": "^1.5.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.17.0",
+    "@eslint/js": "^10.0.0",
     "@release-it/conventional-changelog": "^10.0.5",
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
@@ -47,7 +47,7 @@
     "electron": "^40.1.0",
     "electron-builder": "^26.4.0",
     "esbuild": "^0.27.2",
-    "eslint": "^9.17.0",
+    "eslint": "^10.0.0",
     "globals": "^17.0.0",
     "htmlhint": "^1.8.0",
     "husky": "^9.1.7",
