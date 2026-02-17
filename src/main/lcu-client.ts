@@ -398,6 +398,102 @@ class LCUConnector {
    * Get all owned skins for a champion
    */
   async getChampionSkins(championId: number): Promise<OwnedSkin[]> {
+    // Prefer champion-select carousel data (contains skins + childSkins/chromas with ownership flags)
+    try {
+      interface CarouselChroma {
+        id: number;
+        name: string;
+        chromaPreviewPath?: string;
+        chromaPath?: string;
+        colors?: string[];
+        ownership?: { owned: boolean };
+      }
+
+      interface CarouselSkin {
+        id: number;
+        name: string;
+        championId: number;
+        ownership?: { owned: boolean };
+        childSkins?: CarouselChroma[];
+      }
+
+      const carouselResp = await this.client.request("get", "/lol-champ-select/v1/skin-carousel-skins");
+      const list: CarouselSkin[] = (carouselResp as { data?: CarouselSkin[] })?.data ?? (carouselResp as CarouselSkin[]);
+
+      if (Array.isArray(list)) {
+        const championName = await this.getChampionNameById(championId);
+
+        const ownedFromCarousel = list
+          .filter((s: CarouselSkin) => s && s.championId === championId)
+          .reduce((acc: OwnedSkin[], skin: CarouselSkin) => {
+            const skinOwned = !!skin.ownership?.owned;
+            const childSkins = Array.isArray(skin.childSkins) ? skin.childSkins : [];
+
+            // Chromas are child entries that include a chroma preview path
+            const chromaChildren = childSkins.filter((c: CarouselChroma) => !!c.chromaPreviewPath);
+            const chromaMapped = chromaChildren
+              .filter((c: CarouselChroma) => !!c.ownership?.owned)
+              .map((c: CarouselChroma) => {
+                const chromaId = c.id;
+                return {
+                  id: chromaId,
+                  name: c.name,
+                  chromaPath: c.chromaPreviewPath || c.chromaPath || "",
+                  colors: c.colors || [],
+                  owned: !!c.ownership?.owned,
+                  imageUrl: `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/${championId}/${chromaId}.png`,
+                  chromaNum: chromaId
+                };
+              });
+
+            // Non-chroma childSkins (like K/DA variants) should remain children
+            // but use the skin art (splash/loading) instead of chroma images.
+            const nonChromaChildren = childSkins.filter((c: CarouselChroma) => !c.chromaPreviewPath && !!c.ownership?.owned);
+            const nonChromaAsChromas = nonChromaChildren.map((c: CarouselChroma) => {
+              const chromaId = c.id;
+              const cSkinNum = c.id % 1000;
+              return {
+                id: chromaId,
+                name: c.name,
+                chromaPath: c.chromaPreviewPath || c.chromaPath || "",
+                colors: c.colors || [],
+                owned: !!c.ownership?.owned,
+                // Use DDragon splash art for these non-chroma child skins
+                imageUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_${cSkinNum}.jpg`,
+                chromaNum: chromaId
+              };
+            });
+
+            const chromas = [...chromaMapped, ...nonChromaAsChromas];
+
+            const skinNum = skin.id % 1000;
+
+            // If the parent skin is owned or has owned chromas, include it
+            if (skinOwned || chromas.length > 0) {
+              acc.push({
+                id: skin.id,
+                name: skin.name,
+                ownership: skin.ownership || { owned: !!skinOwned },
+                chromas,
+                hasOwnedChromas: chromas.length > 0,
+                loadingUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championName}_${skinNum}.jpg`,
+                splashUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_${skinNum}.jpg`
+              } as OwnedSkin);
+            }
+
+            return acc;
+          }, [] as OwnedSkin[]);
+
+        if (ownedFromCarousel.length > 0) {
+          return ownedFromCarousel;
+        }
+      }
+    } catch (_error) {
+      // If carousel endpoint isn't available (not in champ select) or request fails,
+      // fall back to the inventory endpoint below.
+    }
+
+    // Fallback: use champion inventory endpoint (ownership + chromas from champion data)
     const champion = await this.getChampion(championId);
     if (!champion || !champion.skins) {
       return [];
