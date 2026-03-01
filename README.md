@@ -19,6 +19,22 @@ An Electron desktop app (with web access) that uses the League Client Update (LC
 - Node.js (v18+) and npm installed
 - League of Legends client installed and running
 
+### Node Version (Recommended)
+
+This repository includes an `.nvmrc` file pinned to the Node version used in CI.
+
+If you use nvm, run:
+
+```bash
+nvm use
+```
+
+Then install dependencies:
+
+```bash
+npm install
+```
+
 ## Installation
 
 ```bash

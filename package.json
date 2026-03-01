@@ -29,6 +29,11 @@
   ],
   "author": "",
   "license": "MIT",
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": ">=24.13.0",
+    "npm": ">=11.6.2"
+  },
   "dependencies": {
     "@hasagi/core": "^0.6.9",
     "axios": "^1.13.5",
