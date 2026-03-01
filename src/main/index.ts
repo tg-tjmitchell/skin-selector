@@ -6,7 +6,8 @@ export type { ServerConfig, ServerState };
  * Create and start the server instance.
  */
 export function startServer(options: ServerConfig = {}): Promise<ServerState> {
-  const isDevelopment = process.env.NODE_ENV === "development";
+  // Running via tsx means __filename is a .ts source file — treat as development
+  const isDevelopment = process.env.NODE_ENV === "development" || __filename.endsWith(".ts");
   serverInstance = new SkinSelectorServer(isDevelopment);
   return serverInstance.start(options);
 }

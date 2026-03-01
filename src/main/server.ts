@@ -3,7 +3,7 @@ import path from "path";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
 import os from "os";
-import { promises as fs } from "fs";
+import { promises as fs, watch as fsWatch, type FSWatcher } from "fs";
 import QRCode from "qrcode";
 import LCUConnector from "./lcu-client";
 import { getErrorMessage } from "../shared/errors";
@@ -53,18 +53,37 @@ export class SkinSelectorServer {
   private logger: Logger;
   private favoritesCache: Record<string, number[]> | null = null;
   private favoritesPath: string;
+  private isDevelopment: boolean;
+  private devReloadWatcher: FSWatcher | null = null;
+  private sseClients: Response[] = [];
 
   constructor(isDevelopment = false) {
     this.app = express();
+    this.isDevelopment = isDevelopment;
     this.logger = new Logger(isDevelopment);
     this.favoritesPath = this.getFavoritesPath();
     this.setupMiddleware();
     this.setupRoutes();
+    if (isDevelopment) {
+      this.setupDevReload();
+    }
+  }
+
+  /**
+   * Returns the directory from which renderer static files are served.
+   * When running via tsx, __dirname points to src/main rather than dist/main,
+   * so resolve dist/renderer from cwd instead.
+   */
+  private getRendererDir(): string {
+    if (__filename.endsWith(".ts")) {
+      return path.join(process.cwd(), "dist", "renderer");
+    }
+    return path.join(__dirname, "..", "renderer");
   }
 
   private setupMiddleware(): void {
     this.app.use(express.json());
-    this.app.use(express.static(path.join(__dirname, "../renderer")));
+    this.app.use(express.static(this.getRendererDir()));
   }
 
   private setupRoutes(): void {
@@ -353,8 +372,62 @@ export class SkinSelectorServer {
      * Serve the main HTML application page
      */
     this.app.get("/", (_req: Request, res: Response) => {
-      res.sendFile(path.join(__dirname, "../renderer/index.html"));
+      res.sendFile(path.join(this.getRendererDir(), "index.html"));
     });
+  }
+
+  /**
+   * Sets up live reload for development mode.
+   * - Serves /__dev-reload-client.js with the SSE client script (only exists in dev)
+   * - Exposes a GET /api/dev-reload SSE endpoint that browsers connect to
+   * - Watches dist/renderer for file changes and pushes a reload event to all clients
+   */
+  private setupDevReload(): void {
+    // Serve the tiny SSE client script — only this route exists in dev, so the
+    // <script> tag in index.html silently 404s (and therefore no-ops) in production
+    this.app.get("/__dev-reload-client.js", (_req: Request, res: Response) => {
+      res.setHeader("Content-Type", "application/javascript");
+      res.send(
+        "(function(){" +
+          "var s=new EventSource('/api/dev-reload');" +
+          "s.onmessage=function(e){if(e.data==='reload')location.reload();};" +
+        "})();"
+      );
+    });
+
+    // SSE endpoint — each connected browser holds one open response
+    this.app.get("/api/dev-reload", (req: Request, res: Response) => {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+
+      this.sseClients.push(res);
+      req.on("close", () => {
+        const clientIndex = this.sseClients.indexOf(res);
+        if (clientIndex !== -1) this.sseClients.splice(clientIndex, 1);
+      });
+    });
+
+    // Watch dist/renderer; debounce to send one reload even when multiple
+    // files are written together (e.g. an esbuild rebuild touches client.js)
+    const rendererDir = this.getRendererDir();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      this.devReloadWatcher = fsWatch(rendererDir, { recursive: false }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          for (const client of this.sseClients) {
+            client.write("data: reload\n\n");
+          }
+          this.logger.info(`[dev] Renderer changed — reloading ${this.sseClients.length} client(s)`);
+        }, 50);
+      });
+    } catch (error) {
+      this.logger.warn(`[dev] Could not watch renderer dir (${rendererDir}): ${getErrorMessage(error)}`);
+    }
+
+    this.logger.info("[dev] Live reload active");
   }
 
   private getNetworkInterfaceCandidates(): NetworkInterface[] {
@@ -585,6 +658,16 @@ export class SkinSelectorServer {
    */
   async shutdown(): Promise<void> {
     this.logger.info("Shutting down server...");
+
+    // Close dev reload watcher and drain SSE clients
+    if (this.devReloadWatcher) {
+      this.devReloadWatcher.close();
+      this.devReloadWatcher = null;
+    }
+    for (const client of this.sseClients) {
+      client.end();
+    }
+    this.sseClients = [];
     
     // Disconnect from LCU
     if (this.lcu) {
