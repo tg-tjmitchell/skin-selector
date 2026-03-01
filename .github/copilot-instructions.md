@@ -10,6 +10,10 @@
 
 ## Essential Patterns & Workflows
 
+### Git Workflow Policy
+- **Always create pull requests** for changes; do not push directly to `main`.
+- Use feature branches and merge through PR review to keep releases and changelogs stable.
+
 ### Build & Run Commands
 - **Development**: `npm run dev` (runs Express server with hot reload via `tsx`)
 - **Full App**: `npm run electron` (builds everything, launches Electron window)
