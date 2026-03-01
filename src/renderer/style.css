@@ -417,8 +417,18 @@ body {
 }
 
 .spell-slot.active {
-    border-color: var(--primary-color);
     box-shadow: 0 0 12px rgba(10, 126, 164, 0.25);
+}
+
+#spell1SlotBtn.active {
+    border-color: var(--primary-color);
+    background: rgba(10, 126, 164, 0.14);
+}
+
+#spell2SlotBtn.active {
+    border-color: var(--warning-color);
+    background: rgba(250, 173, 20, 0.14);
+    box-shadow: 0 0 12px rgba(250, 173, 20, 0.25);
 }
 
 .spell-slot:disabled {
@@ -504,10 +514,12 @@ body {
 
 .spell-quick-grid.active-slot-1 .spell-quick-btn:hover {
     border-color: var(--primary-color);
+    box-shadow: 0 0 12px rgba(10, 126, 164, 0.3);
 }
 
 .spell-quick-grid.active-slot-2 .spell-quick-btn:hover {
     border-color: var(--warning-color);
+    box-shadow: 0 0 12px rgba(250, 173, 20, 0.3);
 }
 
 .spell-quick-btn.selected-slot-1 {
@@ -517,6 +529,7 @@ body {
 
 .spell-quick-btn.selected-slot-1:hover {
     border-color: var(--primary-color);
+    box-shadow: 0 0 12px rgba(10, 126, 164, 0.35);
 }
 
 .spell-quick-btn.selected-slot-2 {
@@ -526,6 +539,7 @@ body {
 
 .spell-quick-btn.selected-slot-2:hover {
     border-color: var(--warning-color);
+    box-shadow: 0 0 12px rgba(250, 173, 20, 0.35);
 }
 
 .spell-quick-btn.active-target {
