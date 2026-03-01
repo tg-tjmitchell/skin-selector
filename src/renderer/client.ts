@@ -7,6 +7,10 @@ import type {
   ChromaData,
   SelectSkinRequest,
   SelectSkinResponse,
+    SummonerSpellData,
+    SummonerSpellsResponse,
+    SelectSpellsRequest,
+    SelectSpellsResponse,
   AcceptReadyCheckResponse,
   ErrorResponse,
   FavoritesResponse,
@@ -48,6 +52,14 @@ interface DOMElements {
     summonerName: HTMLElement;
     inChampSelect: HTMLElement;
     selectedChampion: HTMLElement;
+    spellSelectionArea: HTMLElement;
+    spellsQueueInfo: HTMLElement;
+    spellQuickGrid: HTMLElement;
+    spell1SlotBtn: HTMLButtonElement;
+    spell2SlotBtn: HTMLButtonElement;
+    spell1Icon: HTMLImageElement;
+    spell2Icon: HTMLImageElement;
+    applySpellsBtn: HTMLButtonElement;
     readyCheckPopup: HTMLElement;
     acceptQueueBtn: HTMLButtonElement;
     skinSelectionArea: HTMLElement;
@@ -208,6 +220,16 @@ class SkinSelectorUI {
     private networkInterfaces: NetworkInterface[] = [];
     private selectedNetworkIp: string = '';
     private advancedModeOpen: boolean = false;
+    private availableSummonerSpells: SummonerSpellData[] = [];
+    private currentQueueId: number | null = null;
+    private activeSpellSlot: 1 | 2 = 1;
+    private selectedSpell1Id: number | null = null;
+    private selectedSpell2Id: number | null = null;
+    private wasInChampionSelect: boolean = false;
+    private spellSyncInFlight: boolean = false;
+    private pendingSpellSyncTimer: number | null = null;
+    private suppressSpellStatusUntilMs: number = 0;
+    private lastRequestedSpellPair: string | null = null;
 
     constructor() {
         this.init();
@@ -227,6 +249,8 @@ class SkinSelectorUI {
         void this.loadFavorites();
         this.setupKeyboardShortcuts();
         this.setupPreviewModal();
+        this.setActiveSpellSlot(1);
+        this.setSummonerSpellControlsEnabled(false);
         this.startStatusMonitor();
     }
 
@@ -263,6 +287,14 @@ class SkinSelectorUI {
             summonerName: this.getElement('summonerName'),
             inChampSelect: this.getElement('inChampSelect'),
             selectedChampion: this.getElement('selectedChampion'),
+            spellSelectionArea: this.getElement('spellSelectionArea'),
+            spellsQueueInfo: this.getElement('spellsQueueInfo'),
+            spellQuickGrid: this.getElement('spellQuickGrid'),
+            spell1SlotBtn: this.getElement('spell1SlotBtn') as HTMLButtonElement,
+            spell2SlotBtn: this.getElement('spell2SlotBtn') as HTMLButtonElement,
+            spell1Icon: this.getElement('spell1Icon') as HTMLImageElement,
+            spell2Icon: this.getElement('spell2Icon') as HTMLImageElement,
+            applySpellsBtn: this.getElement('applySpellsBtn') as HTMLButtonElement,
             readyCheckPopup: this.getElement('readyCheckPopup'),
             acceptQueueBtn: this.getElement('acceptQueueBtn') as HTMLButtonElement,
             skinSelectionArea: this.getElement('skinSelectionArea'),
@@ -382,6 +414,11 @@ class SkinSelectorUI {
     private setupEventListeners(): void {
         this.elements.autoSelectBtn.addEventListener('click', () => this.autoSelectRandomSkin());
         this.elements.refreshBtn.addEventListener('click', () => this.refreshSkins());
+        this.elements.applySpellsBtn.addEventListener('click', () => {
+            void this.applySelectedSummonerSpells(true);
+        });
+        this.elements.spell1SlotBtn.addEventListener('click', () => this.setActiveSpellSlot(1));
+        this.elements.spell2SlotBtn.addEventListener('click', () => this.setActiveSpellSlot(2));
 
         this.elements.settingsToggleBtn.addEventListener('click', () => this.toggleSettingsDrawer());
         this.elements.settingsCloseBtn.addEventListener('click', () => this.closeSettingsDrawer());
@@ -626,10 +663,41 @@ class SkinSelectorUI {
 
             // Update champion select status
             if (data.inChampSelect) {
+                const enteringChampionSelect = !this.wasInChampionSelect;
+                this.wasInChampionSelect = true;
                 this.elements.inChampSelect.textContent = '✅ Yes';
                 this.elements.selectedChampion.textContent = data.selectedChampion || 'Loading...';
+                this.elements.spellSelectionArea.style.display = 'block';
+                if (enteringChampionSelect) {
+                    this.setSectionCollapsed('spells', false);
+                }
                 const isLockedIn = !!data.lockedIn;
                 const championChanged = data.selectedChampionId && this.currentChampionId !== data.selectedChampionId;
+                const nextQueueId = data.queueId ?? null;
+                const queueChanged = nextQueueId !== this.currentQueueId;
+
+                if (queueChanged || this.availableSummonerSpells.length === 0) {
+                    await this.refreshSummonerSpells(nextQueueId);
+                }
+
+                const incomingSpell1Id = data.selectedSpell1Id ?? null;
+                const incomingSpell2Id = data.selectedSpell2Id ?? null;
+                const incomingPair = `${incomingSpell1Id}-${incomingSpell2Id}`;
+                const isSpellSyncGuardActive = this.spellSyncInFlight || Date.now() < this.suppressSpellStatusUntilMs;
+
+                if (this.lastRequestedSpellPair && incomingPair === this.lastRequestedSpellPair) {
+                    this.spellSyncInFlight = false;
+                    this.suppressSpellStatusUntilMs = 0;
+                    this.lastRequestedSpellPair = null;
+                    this.selectedSpell1Id = incomingSpell1Id;
+                    this.selectedSpell2Id = incomingSpell2Id;
+                } else if (!isSpellSyncGuardActive) {
+                    this.selectedSpell1Id = incomingSpell1Id;
+                    this.selectedSpell2Id = incomingSpell2Id;
+                }
+
+                this.updateSpellIcons();
+                this.renderSpellQuickGrid();
                 
                 // If champion ID changed, refresh skins
                 if (championChanged && data.selectedChampionId) {
@@ -659,12 +727,28 @@ class SkinSelectorUI {
                 this.lockedIn = isLockedIn;
                 this.currentChampionId = data.selectedChampionId || null;
             } else {
+                this.wasInChampionSelect = false;
                 this.elements.inChampSelect.textContent = '❌ No';
                 this.elements.selectedChampion.textContent = 'None';
                 this.currentChampionId = null;
                 this.lockedIn = false;
                 this.focusedChampionId = null;
+                this.currentQueueId = null;
+                this.availableSummonerSpells = [];
+                this.selectedSpell1Id = null;
+                this.selectedSpell2Id = null;
+                this.spellSyncInFlight = false;
+                this.lastRequestedSpellPair = null;
+                this.suppressSpellStatusUntilMs = 0;
+                if (this.pendingSpellSyncTimer !== null) {
+                    window.clearTimeout(this.pendingSpellSyncTimer);
+                    this.pendingSpellSyncTimer = null;
+                }
                 this.elements.skinSelectionArea.style.display = 'none';
+                this.elements.spellSelectionArea.style.display = 'none';
+                this.updateSpellIcons();
+                this.renderSpellQuickGrid();
+                this.setSummonerSpellControlsEnabled(false);
                 this.updateAutoPickToggleState();
             }
 
@@ -747,6 +831,285 @@ class SkinSelectorUI {
             this.showToast('Failed to refresh skins', 'error');
         } finally {
             this.elements.refreshBtn.disabled = false;
+        }
+    }
+
+    private async refreshSummonerSpells(queueId: number | null = null): Promise<void> {
+        try {
+            const endpoint = queueId !== null
+                ? `/api/summoner-spells?queueId=${encodeURIComponent(String(queueId))}`
+                : '/api/summoner-spells';
+            const response = await fetch(endpoint);
+            const data = await response.json() as SummonerSpellsResponse | ErrorResponse;
+
+            if ('error' in data) {
+                this.log(`Failed to load summoner spells: ${data.error}`, 'error');
+                this.setSummonerSpellControlsEnabled(false);
+                return;
+            }
+
+            this.availableSummonerSpells = data.spells;
+            this.currentQueueId = data.queueId;
+            this.populateSummonerSpellState(data);
+        } catch (error) {
+            this.log(`Failed to load summoner spells: ${getErrorMessage(error)}`, 'error');
+            this.setSummonerSpellControlsEnabled(false);
+        }
+    }
+
+    private populateSummonerSpellState(data: SummonerSpellsResponse): void {
+        const queueName = data.queueName ?? 'Unknown';
+        const modeTags = data.modeTags.length > 0 ? data.modeTags.join(', ') : 'Any';
+        this.elements.spellsQueueInfo.textContent = `Queue: ${queueName} (${modeTags})`;
+
+        if (data.spells.length === 0) {
+            this.selectedSpell1Id = null;
+            this.selectedSpell2Id = null;
+            this.updateSpellIcons();
+            this.renderSpellQuickGrid();
+            this.setSummonerSpellControlsEnabled(false);
+            return;
+        }
+
+        const fallbackSpell1 = data.spells[0]?.id ?? null;
+        const fallbackSpell2 = (data.spells.find((spell) => spell.id !== fallbackSpell1)?.id) ?? fallbackSpell1;
+
+        this.selectedSpell1Id = data.selectedSpell1Id ?? fallbackSpell1;
+        this.selectedSpell2Id = data.selectedSpell2Id ?? fallbackSpell2;
+
+        if (this.selectedSpell1Id !== null && this.selectedSpell2Id === this.selectedSpell1Id) {
+            this.selectedSpell2Id = fallbackSpell2;
+        }
+
+        this.updateSpellIcons();
+        this.renderSpellQuickGrid();
+        this.setSummonerSpellControlsEnabled(true);
+    }
+
+    private setActiveSpellSlot(slot: 1 | 2): void {
+        this.activeSpellSlot = slot;
+        this.elements.spell1SlotBtn.classList.toggle('active', slot === 1);
+        this.elements.spell2SlotBtn.classList.toggle('active', slot === 2);
+    }
+
+    private updateSpellIcons(): void {
+        const spell1Url = this.getSpellIconUrl(this.selectedSpell1Id);
+        const spell2Url = this.getSpellIconUrl(this.selectedSpell2Id);
+
+        this.elements.spell1Icon.src = spell1Url;
+        this.elements.spell2Icon.src = spell2Url;
+    }
+
+    private renderSpellQuickGrid(): void {
+        this.elements.spellQuickGrid.innerHTML = '';
+        this.elements.spellQuickGrid.classList.toggle('active-slot-1', this.activeSpellSlot === 1);
+        this.elements.spellQuickGrid.classList.toggle('active-slot-2', this.activeSpellSlot === 2);
+
+        const selectedSpell1 = this.selectedSpell1Id;
+        const selectedSpell2 = this.selectedSpell2Id;
+
+        const sortedSpells = [...this.availableSummonerSpells].sort((left, right) => left.name.localeCompare(right.name));
+        for (const spell of sortedSpells) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'spell-quick-btn';
+
+            const isSelectedSpell1 = selectedSpell1 === spell.id;
+            const isSelectedSpell2 = selectedSpell2 === spell.id;
+
+            if (isSelectedSpell1) {
+                button.classList.add('selected-slot-1');
+            }
+
+            if (isSelectedSpell2) {
+                button.classList.add('selected-slot-2');
+            }
+
+            if ((this.activeSpellSlot === 1 && isSelectedSpell1) || (this.activeSpellSlot === 2 && isSelectedSpell2)) {
+                button.classList.add('active-target');
+            }
+
+            const icon = document.createElement('img');
+            icon.className = 'spell-quick-icon';
+            icon.alt = spell.name;
+            icon.src = this.getSpellIconUrl(spell.id);
+
+            const name = document.createElement('span');
+            name.className = 'spell-quick-name';
+            name.textContent = spell.name;
+
+            if (isSelectedSpell1 || isSelectedSpell2) {
+                const slotBadge = document.createElement('span');
+                slotBadge.className = `spell-quick-badge ${isSelectedSpell1 ? 'slot-1' : 'slot-2'}`;
+                slotBadge.textContent = isSelectedSpell1 ? 'S1' : 'S2';
+                button.appendChild(slotBadge);
+            }
+
+            button.appendChild(icon);
+            button.appendChild(name);
+            button.title = `${spell.name} (${spell.id})`;
+            button.addEventListener('click', () => {
+                let selectionChanged = false;
+
+                if (this.activeSpellSlot === 1) {
+                    if (this.selectedSpell1Id === spell.id) {
+                        this.setActiveSpellSlot(2);
+                    } else if (this.selectedSpell2Id === spell.id && this.selectedSpell1Id !== null) {
+                        const previousSpell1 = this.selectedSpell1Id;
+                        this.selectedSpell1Id = this.selectedSpell2Id;
+                        this.selectedSpell2Id = previousSpell1;
+                        selectionChanged = true;
+                        this.setActiveSpellSlot(2);
+                    } else {
+                        this.selectedSpell1Id = spell.id;
+                        selectionChanged = true;
+                        this.setActiveSpellSlot(2);
+                    }
+                } else {
+                    if (this.selectedSpell2Id === spell.id) {
+                        this.setActiveSpellSlot(1);
+                    } else if (this.selectedSpell1Id === spell.id && this.selectedSpell2Id !== null) {
+                        const previousSpell2 = this.selectedSpell2Id;
+                        this.selectedSpell2Id = this.selectedSpell1Id;
+                        this.selectedSpell1Id = previousSpell2;
+                        selectionChanged = true;
+                        this.setActiveSpellSlot(1);
+                    } else {
+                        this.selectedSpell2Id = spell.id;
+                        selectionChanged = true;
+                        this.setActiveSpellSlot(1);
+                    }
+                }
+
+                this.updateSpellIcons();
+                this.renderSpellQuickGrid();
+                if (selectionChanged) {
+                    this.queueLiveSpellSync();
+                }
+            });
+
+            this.elements.spellQuickGrid.appendChild(button);
+        }
+    }
+
+    private getSpellIconUrl(spellId: number | null): string {
+        const byId: Record<number, string> = {
+            1: 'SummonerBoost.png',
+            3: 'SummonerExhaust.png',
+            4: 'SummonerFlash.png',
+            6: 'SummonerHaste.png',
+            7: 'SummonerHeal.png',
+            11: 'SummonerSmite.png',
+            12: 'SummonerTeleport.png',
+            13: 'SummonerMana.png',
+            14: 'SummonerDot.png',
+            21: 'SummonerBarrier.png',
+            30: 'SummonerPoroRecall.png',
+            31: 'SummonerPoroThrow.png',
+            32: 'SummonerSnowball.png',
+            39: 'SummonerSnowURFSnowball_Mark.png',
+            54: 'Summoner_UltBookPlaceholder.png',
+            55: 'Summoner_UltBookSmitePlaceholder.png',
+            2201: 'SummonerCherryHold.png',
+            2202: 'SummonerCherryFlash.png'
+        };
+
+        if (spellId === null) {
+            return 'https://ddragon.leagueoflegends.com/cdn/15.5.1/img/profileicon/29.png';
+        }
+
+        const filename = byId[spellId];
+        if (!filename) {
+            return 'https://ddragon.leagueoflegends.com/cdn/15.5.1/img/profileicon/29.png';
+        }
+
+        return `https://ddragon.leagueoflegends.com/cdn/15.5.1/img/spell/${filename}`;
+    }
+
+    private setSummonerSpellControlsEnabled(enabled: boolean): void {
+        this.elements.applySpellsBtn.disabled = !enabled;
+        this.elements.spell1SlotBtn.disabled = !enabled;
+        this.elements.spell2SlotBtn.disabled = !enabled;
+        this.elements.spellQuickGrid.classList.toggle('is-disabled', !enabled);
+    }
+
+    private queueLiveSpellSync(): void {
+        if (this.pendingSpellSyncTimer !== null) {
+            window.clearTimeout(this.pendingSpellSyncTimer);
+            this.pendingSpellSyncTimer = null;
+        }
+
+        this.suppressSpellStatusUntilMs = Date.now() + 3000;
+        this.pendingSpellSyncTimer = window.setTimeout(() => {
+            this.pendingSpellSyncTimer = null;
+            void this.applySelectedSummonerSpells();
+        }, 200);
+    }
+
+    private setSectionCollapsed(sectionName: string, collapsed: boolean): void {
+        const content = document.getElementById(`${sectionName}-content`);
+        if (!content) {
+            return;
+        }
+
+        content.classList.toggle('collapsed', collapsed);
+
+        const button = document.querySelector<HTMLButtonElement>(`.collapse-btn[data-section="${sectionName}"]`);
+        if (button) {
+            button.textContent = collapsed ? '+' : '−';
+        }
+
+        localStorage.setItem(`section-${sectionName}-collapsed`, collapsed.toString());
+    }
+
+    private async applySelectedSummonerSpells(collapseAfterApply: boolean = false): Promise<void> {
+        const spell1Id = this.selectedSpell1Id;
+        const spell2Id = this.selectedSpell2Id;
+
+        if (spell1Id === null || spell2Id === null) {
+            this.log('Please select both summoner spells', 'warning');
+            return;
+        }
+
+        if (spell1Id === spell2Id) {
+            this.log('Spell 1 and Spell 2 must be different', 'warning');
+            return;
+        }
+
+        try {
+            this.lastRequestedSpellPair = `${spell1Id}-${spell2Id}`;
+            this.spellSyncInFlight = true;
+            this.elements.applySpellsBtn.disabled = true;
+            const payload: SelectSpellsRequest = { spell1Id, spell2Id };
+
+            const response = await fetch('/api/select-spells', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json() as SelectSpellsResponse | ErrorResponse;
+            if ('error' in result) {
+                this.spellSyncInFlight = false;
+                this.lastRequestedSpellPair = null;
+                this.log(`Failed to select spells: ${result.error}`, 'error');
+                this.showToast(`Failed to select spells: ${result.error}`, 'error');
+                return;
+            }
+
+            this.log(result.message, 'success');
+            if (collapseAfterApply) {
+                this.setSectionCollapsed('spells', true);
+            }
+        } catch (error) {
+            this.spellSyncInFlight = false;
+            this.lastRequestedSpellPair = null;
+            this.log(`Failed to select spells: ${getErrorMessage(error)}`, 'error');
+            this.showToast('Failed to select spells', 'error');
+        } finally {
+            this.elements.applySpellsBtn.disabled = false;
         }
     }
 

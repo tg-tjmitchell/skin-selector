@@ -15,6 +15,9 @@ import type {
   SkinsResponse,
   SelectSkinRequest,
   SelectSkinResponse,
+  SummonerSpellsResponse,
+  SelectSpellsRequest,
+  SelectSpellsResponse,
   AcceptReadyCheckResponse,
   ErrorResponse,
   FavoritesResponse,
@@ -133,10 +136,17 @@ export class SkinSelectorServer {
         let selectedChampion = "None";
         let selectedChampionId: number | null = null;
         let lockedIn = false;
+        let selectedSpell1Id: number | null = null;
+        let selectedSpell2Id: number | null = null;
+        let queueId: number | null = null;
 
         if (inChampSelect && session) {
           selectedChampionId = this.lcu.getSelectedChampionFromSession(session);
           lockedIn = this.lcu.isLocalPlayerLockedIn(session);
+          const selectedSpells = await this.lcu.getSelectedSummonerSpells();
+          selectedSpell1Id = selectedSpells.spell1Id;
+          selectedSpell2Id = selectedSpells.spell2Id;
+          queueId = await this.lcu.getCurrentQueueId();
           if (selectedChampionId) {
             selectedChampion = `Champion ID: ${selectedChampionId}`;
           }
@@ -149,6 +159,9 @@ export class SkinSelectorServer {
           selectedChampion,
           selectedChampionId,
           lockedIn,
+          queueId,
+          selectedSpell1Id,
+          selectedSpell2Id,
           readyCheck
         };
         return res.json(response);
@@ -202,6 +215,67 @@ export class SkinSelectorServer {
           ? `Selected skin ${skinId} with chroma ${chromaId}`
           : `Selected skin ${skinId}`;
         return res.json({ success: true, message });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
+    /**
+     * Get available summoner spells for the current or specified queue
+     */
+    this.app.get("/api/summoner-spells", async (req: Request, res: Response<SummonerSpellsResponse | ErrorResponse>) => {
+      try {
+        if (!this.lcu || !(await this.lcu.isConnected())) {
+          return this.respondError(res, 503, "Not connected to League Client");
+        }
+
+        const queueIdQuery = req.query.queueId;
+        const queueIdString = Array.isArray(queueIdQuery) ? queueIdQuery[0] : queueIdQuery;
+        const queueIdFromQuery = typeof queueIdString === "string" && queueIdString.length > 0
+          ? Number.parseInt(queueIdString, 10)
+          : null;
+        const queueId = Number.isFinite(queueIdFromQuery) && queueIdFromQuery !== null
+          ? queueIdFromQuery
+          : await this.lcu.getCurrentQueueId();
+
+        const selectedSpells = await this.lcu.getSelectedSummonerSpells();
+        const queueSpellData = await this.lcu.getSummonerSpellsForQueue(queueId);
+
+        return res.json({
+          queueId,
+          queueName: queueSpellData.queueName,
+          modeTags: queueSpellData.modeTags,
+          selectedSpell1Id: selectedSpells.spell1Id,
+          selectedSpell2Id: selectedSpells.spell2Id,
+          spells: queueSpellData.spells
+        });
+      } catch (error) {
+        const message = getErrorMessage(error);
+        return this.respondError(res, 500, message);
+      }
+    });
+
+    /**
+     * Set selected summoner spells in champion select
+     */
+    this.app.post("/api/select-spells", async (req: Request, res: Response<SelectSpellsResponse | ErrorResponse>) => {
+      try {
+        if (!this.lcu || !(await this.lcu.isConnected())) {
+          return this.respondError(res, 503, "Not connected to League Client");
+        }
+
+        const { spell1Id, spell2Id } = req.body as SelectSpellsRequest;
+
+        if (!spell1Id || !spell2Id) {
+          return this.respondError(res, 400, "Missing spell1Id or spell2Id");
+        }
+
+        await this.lcu.selectSummonerSpells(spell1Id, spell2Id);
+        return res.json({
+          success: true,
+          message: `Selected summoner spells ${spell1Id} and ${spell2Id}`
+        });
       } catch (error) {
         const message = getErrorMessage(error);
         return this.respondError(res, 500, message);

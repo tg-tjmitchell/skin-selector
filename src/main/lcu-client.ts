@@ -2,6 +2,7 @@ import axios from "axios";
 import { HasagiClient, LCUError } from "@hasagi/core";
 import type { LCUTypes } from "@hasagi/core";
 import { getErrorMessage } from "../shared/errors";
+import type { SummonerSpellData } from "../shared/api-types";
 
 const DEFAULT_RETRY_DELAY_MS = 1000;
 const CONNECTION_RETRY_INTERVAL_MS = 5000;
@@ -69,6 +70,53 @@ type DDragonChampionList = {
 
 type DDragonVersions = string[];
 
+type CDragonQueue = {
+  id: number;
+  name?: string;
+  shortName?: string;
+  description?: string;
+  gameSelectModeGroup?: string;
+};
+
+type CDragonSpell = SummonerSpellData;
+
+type LobbyResponse = {
+  queueId?: number;
+};
+
+type GameflowSession = {
+  gameData?: {
+    queue?: {
+      id?: number;
+    };
+    mapId?: number;
+    gameMode?: string;
+    isCustomGame?: boolean;
+  };
+  map?: {
+    id?: number;
+  };
+  gameMode?: string;
+  isCustomGame?: boolean;
+};
+
+type SpellModeHints = {
+  mapId: number | null;
+  gameMode: string | null;
+  isCustomGame: boolean;
+};
+
+type ChampSelectSpellSelection = {
+  spell1Id?: number;
+  spell2Id?: number;
+};
+
+type ChampSelectTeamMember = {
+  cellId?: number;
+  spell1Id?: number;
+  spell2Id?: number;
+};
+
 class LCUConnector {
   private client: HasagiClient;
   private championMap: ChampionMap | null = null;
@@ -77,6 +125,8 @@ class LCUConnector {
   private lastConnectionState: boolean = false;
   private connectionAttemptTimer: NodeJS.Timeout | null = null;
   private isAttemptingConnection: boolean = false;
+  private communityDragonSpellsCache: CDragonSpell[] | null = null;
+  private communityDragonQueuesCache: CDragonQueue[] | null = null;
 
   constructor() {
     this.client = new HasagiClient({
@@ -647,6 +697,262 @@ class LCUConnector {
     } catch (error) {
       throw new Error(`Failed to accept ready check: ${getErrorMessage(error)}`, { cause: error });
     }
+  }
+
+  /**
+   * Get current queue ID from lobby if available
+   */
+  async getCurrentQueueId(): Promise<number | null> {
+    try {
+      const lobby = await this.client.request("get", "/lol-lobby/v2/lobby") as LobbyResponse;
+      if (typeof lobby?.queueId === "number") {
+        return lobby.queueId;
+      }
+    } catch (error) {
+      if (!this.isNotFoundError(error)) {
+        console.log("Unable to read lobby queue id:", getErrorMessage(error));
+      }
+    }
+
+    const gameflow = await this.getGameflowSession();
+    const queueIdFromGameflow = gameflow?.gameData?.queue?.id;
+    return typeof queueIdFromGameflow === "number" ? queueIdFromGameflow : null;
+  }
+
+  /**
+   * Read selected summoner spells from champ select session
+   */
+  getSelectedSummonerSpellsFromSession(session: ChampSelectSession | null): { spell1Id: number | null; spell2Id: number | null } {
+    if (!session) {
+      return { spell1Id: null, spell2Id: null };
+    }
+
+    const mySelection = (session as unknown as { mySelection?: ChampSelectSpellSelection }).mySelection;
+    const fromMySelectionSpell1 = typeof mySelection?.spell1Id === "number" ? mySelection.spell1Id : null;
+    const fromMySelectionSpell2 = typeof mySelection?.spell2Id === "number" ? mySelection.spell2Id : null;
+
+    if (fromMySelectionSpell1 !== null || fromMySelectionSpell2 !== null) {
+      return {
+        spell1Id: fromMySelectionSpell1,
+        spell2Id: fromMySelectionSpell2
+      };
+    }
+
+    const localPlayerCellId = session.localPlayerCellId;
+    const myTeam = (session.myTeam ?? []) as ChampSelectTeamMember[];
+    const localPlayer = myTeam.find((member) => member.cellId === localPlayerCellId);
+
+    return {
+      spell1Id: typeof localPlayer?.spell1Id === "number" ? localPlayer.spell1Id : null,
+      spell2Id: typeof localPlayer?.spell2Id === "number" ? localPlayer.spell2Id : null
+    };
+  }
+
+  /**
+   * Read selected summoner spells directly from my-selection endpoint
+   */
+  async getSelectedSummonerSpells(): Promise<{ spell1Id: number | null; spell2Id: number | null }> {
+    try {
+      const mySelection = await this.client.request(
+        "get",
+        "/lol-champ-select/v1/session/my-selection"
+      ) as ChampSelectSpellSelection;
+
+      return {
+        spell1Id: typeof mySelection?.spell1Id === "number" ? mySelection.spell1Id : null,
+        spell2Id: typeof mySelection?.spell2Id === "number" ? mySelection.spell2Id : null
+      };
+    } catch (error) {
+      if (!this.isNotFoundError(error)) {
+        console.log("Unable to read my-selection spell ids:", getErrorMessage(error));
+      }
+    }
+
+    const session = await this.getChampSelectSession();
+    return this.getSelectedSummonerSpellsFromSession(session);
+  }
+
+  /**
+   * Select summoner spells in champion select
+   */
+  async selectSummonerSpells(spell1Id: number, spell2Id: number): Promise<boolean> {
+    try {
+      const session = await this.getChampSelectSession();
+      if (!session) {
+        throw new Error("Not in champion select");
+      }
+
+      await this.client.request(
+        "patch",
+        "/lol-champ-select/v1/session/my-selection",
+        {
+          body: { spell1Id, spell2Id }
+        }
+      );
+
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to select summoner spells: ${getErrorMessage(error)}`, { cause: error });
+    }
+  }
+
+  /**
+   * Get queue-aware available summoner spells from CommunityDragon
+   */
+  async getSummonerSpellsForQueue(queueId: number | null): Promise<{ queueName: string | null; modeTags: string[]; spells: SummonerSpellData[] }> {
+    const [queues, spells] = await Promise.all([
+      this.getCommunityDragonQueues(),
+      this.getCommunityDragonSpells()
+    ]);
+
+    const modeHints = await this.getSpellModeHints();
+
+    const queue = queueId !== null
+      ? (queues.find((entry) => entry.id === queueId && !!entry.name) ?? queues.find((entry) => entry.id === queueId) ?? null)
+      : null;
+
+    const modeTags = this.inferSpellModeTags(queue, modeHints);
+    if (modeTags.length === 0) {
+      return {
+        queueName: queue?.name ?? null,
+        modeTags,
+        spells
+      };
+    }
+
+    const filteredSpells = spells.filter((spell) => spell.gameModes.some((mode) => modeTags.includes(mode)));
+    return {
+      queueName: queue?.name ?? null,
+      modeTags,
+      spells: filteredSpells
+    };
+  }
+
+  /**
+   * Get all summoner spells from CommunityDragon
+   */
+  private async getCommunityDragonSpells(): Promise<CDragonSpell[]> {
+    if (this.communityDragonSpellsCache) {
+      return this.communityDragonSpellsCache;
+    }
+
+    const response = await axios.get<CDragonSpell[]>(
+      "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/summoner-spells.json"
+    );
+
+    this.communityDragonSpellsCache = response.data;
+    return this.communityDragonSpellsCache;
+  }
+
+  /**
+   * Get queue metadata from CommunityDragon
+   */
+  private async getCommunityDragonQueues(): Promise<CDragonQueue[]> {
+    if (this.communityDragonQueuesCache) {
+      return this.communityDragonQueuesCache;
+    }
+
+    const response = await axios.get<CDragonQueue[]>(
+      "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/queues.json"
+    );
+
+    this.communityDragonQueuesCache = response.data;
+    return this.communityDragonQueuesCache;
+  }
+
+  /**
+   * Infer spell mode tags based on queue metadata
+   */
+  private inferSpellModeTags(queue: CDragonQueue | null, modeHints: SpellModeHints): string[] {
+    const modeTags = new Set<string>();
+    const gameSelectModeGroup = (queue?.gameSelectModeGroup ?? "").toUpperCase();
+    const searchableText = `${queue?.name ?? ""} ${queue?.shortName ?? ""} ${queue?.description ?? ""}`.toUpperCase();
+
+    if (gameSelectModeGroup.includes("ARAM")) {
+      modeTags.add("ARAM");
+    }
+    if (gameSelectModeGroup.includes("SUMMONERSRIFT")) {
+      modeTags.add("CLASSIC");
+    }
+
+    if (searchableText.includes("ARAM")) modeTags.add("ARAM");
+    if (searchableText.includes("MAYHEM")) modeTags.add("KIWI");
+    if (searchableText.includes("SWIFTPLAY") || searchableText.includes("QUICKPLAY")) modeTags.add("SWIFTPLAY");
+    if (searchableText.includes("ARENA")) modeTags.add("CHERRY");
+    if (searchableText.includes("ULTIMATE SPELLBOOK") || searchableText.includes("ULTBOOK")) modeTags.add("ULTBOOK");
+    if (searchableText.includes("NEXUS BLITZ")) modeTags.add("NEXUSBLITZ");
+    if (searchableText.includes("ONE FOR ALL")) modeTags.add("ONEFORALL");
+    if (searchableText.includes("URF")) modeTags.add("URF");
+    if (searchableText.includes("SNOW")) modeTags.add("SNOWURF");
+    if (searchableText.includes("PORO")) modeTags.add("KINGPORO");
+    if (searchableText.includes("ARSR")) modeTags.add("ARSR");
+    if (searchableText.includes("BRAWL")) modeTags.add("BRAWL");
+    if (searchableText.includes("FIRST BLOOD") || searchableText.includes("1V1")) modeTags.add("FIRSTBLOOD");
+    if (searchableText.includes("TUTORIAL")) modeTags.add("TUTORIAL");
+    if (searchableText.includes("PRACTICE")) modeTags.add("PRACTICETOOL");
+
+    if (modeHints.mapId === 12) {
+      modeTags.add("ARAM");
+    }
+    if (modeHints.mapId === 11) {
+      modeTags.add("CLASSIC");
+    }
+
+    const hintMode = (modeHints.gameMode ?? "").toUpperCase();
+    if (hintMode.includes("ARAM")) modeTags.add("ARAM");
+    if (hintMode.includes("CLASSIC") || hintMode.includes("SUMMONERSRIFT")) modeTags.add("CLASSIC");
+    if (hintMode.includes("URF")) modeTags.add("URF");
+    if (hintMode.includes("ULTBOOK")) modeTags.add("ULTBOOK");
+    if (hintMode.includes("NEXUSBLITZ")) modeTags.add("NEXUSBLITZ");
+    if (hintMode.includes("ONEFORALL")) modeTags.add("ONEFORALL");
+    if (hintMode.includes("CHERRY") || hintMode.includes("ARENA")) modeTags.add("CHERRY");
+
+    if (modeHints.isCustomGame && modeTags.size === 0) {
+      if (modeHints.mapId === 12) {
+        modeTags.add("ARAM");
+      } else {
+        modeTags.add("CLASSIC");
+      }
+    }
+
+    if (modeTags.size === 0) {
+      modeTags.add("CLASSIC");
+    }
+
+    return Array.from(modeTags);
+  }
+
+  /**
+   * Get current gameflow session when available
+   */
+  private async getGameflowSession(): Promise<GameflowSession | null> {
+    try {
+      return await this.client.request("get", "/lol-gameflow/v1/session") as GameflowSession;
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
+      console.log("Unable to read gameflow session:", getErrorMessage(error));
+      return null;
+    }
+  }
+
+  /**
+   * Build mode hints from gameflow data for better spell filtering
+   */
+  private async getSpellModeHints(): Promise<SpellModeHints> {
+    const gameflow = await this.getGameflowSession();
+    const mapId = typeof gameflow?.gameData?.mapId === "number"
+      ? gameflow.gameData.mapId
+      : (typeof gameflow?.map?.id === "number" ? gameflow.map.id : null);
+    const gameMode = gameflow?.gameData?.gameMode ?? gameflow?.gameMode ?? null;
+    const isCustomGame = Boolean(gameflow?.gameData?.isCustomGame ?? gameflow?.isCustomGame);
+
+    return {
+      mapId,
+      gameMode,
+      isCustomGame
+    };
   }
 }
 

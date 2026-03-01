@@ -56,6 +56,9 @@ export interface StatusResponse {
   selectedChampion?: string;
   selectedChampionId?: number | null;
   lockedIn?: boolean;
+  queueId?: number | null;
+  selectedSpell1Id?: number | null;
+  selectedSpell2Id?: number | null;
   readyCheck?: ReadyCheckState | null;
 }
 
@@ -103,6 +106,47 @@ export interface SelectSkinRequest {
  * Select skin response
  */
 export interface SelectSkinResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Summoner spell data from CommunityDragon
+ */
+export interface SummonerSpellData {
+  id: number;
+  name: string;
+  description: string;
+  summonerLevel: number;
+  cooldown: number;
+  gameModes: string[];
+  iconPath: string;
+}
+
+/**
+ * Summoner spells endpoint response
+ */
+export interface SummonerSpellsResponse {
+  queueId: number | null;
+  queueName: string | null;
+  modeTags: string[];
+  selectedSpell1Id: number | null;
+  selectedSpell2Id: number | null;
+  spells: SummonerSpellData[];
+}
+
+/**
+ * Select summoner spells request payload
+ */
+export interface SelectSpellsRequest {
+  spell1Id: number;
+  spell2Id: number;
+}
+
+/**
+ * Select summoner spells response
+ */
+export interface SelectSpellsResponse {
   success: boolean;
   message: string;
 }
@@ -158,6 +202,8 @@ export const API_ENDPOINTS = {
   STATUS: "/api/status",
   SKINS: (championId: number) => `/api/skins/${championId}`,
   SELECT_SKIN: "/api/select-skin",
+  SUMMONER_SPELLS: "/api/summoner-spells",
+  SELECT_SPELLS: "/api/select-spells",
   ACCEPT_READY_CHECK: "/api/accept-ready-check",
   FAVORITES: "/api/favorites",
   TOGGLE_FAVORITE: "/api/favorites/toggle"

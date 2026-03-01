@@ -78,6 +78,31 @@
                 </div>
             </div>
 
+            <!-- Summoner Spell Selection -->
+            <div class="monitor-section" id="spellSelectionArea" style="display: none;">
+                <div class="section-header">
+                    <h2>Summoner Spells</h2>
+                    <button class="collapse-btn" data-section="spells">−</button>
+                </div>
+                <div class="section-content" id="spells-content">
+                    <div class="spell-meta" id="spellsQueueInfo">Queue: Unknown</div>
+                    <div class="spell-slot-row">
+                        <button class="spell-slot active" id="spell1SlotBtn" type="button">
+                            <img id="spell1Icon" class="spell-slot-icon" alt="Spell 1 icon" />
+                            <span class="spell-slot-label">Spell 1</span>
+                        </button>
+                        <button class="spell-slot" id="spell2SlotBtn" type="button">
+                            <img id="spell2Icon" class="spell-slot-icon" alt="Spell 2 icon" />
+                            <span class="spell-slot-label">Spell 2</span>
+                        </button>
+                    </div>
+                    <div class="spell-quick-grid" id="spellQuickGrid"></div>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="applySpellsBtn">✅ Finish Spell Election</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Skin Selection Area -->
             <div class="skin-selection-area" id="skinSelectionArea" style="display: none;">
                 <div class="section-header">
