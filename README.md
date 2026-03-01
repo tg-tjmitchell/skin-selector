@@ -50,7 +50,17 @@ Then open `http://localhost:3000` in your browser.
 npm run dev
 ```
 
-Runs the server with hot reload using `tsx`.
+Runs the Express server with hot reload (`tsx watch`) and automatically rebuilds the renderer on every change. Refresh your browser to see renderer updates.
+
+### Electron Development Mode
+
+```bash
+npm run dev:electron
+```
+
+Performs an initial build, then watches for changes:
+- **Renderer changes** (TypeScript/CSS/HTML): rebuilt automatically — refresh the Electron window to see updates
+- **Main process changes**: TypeScript recompiled and Electron relaunched automatically
 
 ### Build Installer (Windows)
 
