@@ -1,0 +1,5 @@
+{
+  "watch": ["dist/main"],
+  "exec": "npx electron .",
+  "delay": "1000"
+}

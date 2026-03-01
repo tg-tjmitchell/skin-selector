@@ -60,7 +60,7 @@ npm run dev:electron
 
 Performs an initial build, then watches for changes:
 - **Renderer changes** (TypeScript/CSS/HTML): rebuilt automatically — refresh the Electron window to see updates
-- **Main process changes**: TypeScript recompiled and Electron relaunched automatically
+- **Main process changes**: TypeScript recompiled and Electron relaunched automatically (1 second delay allows the full `tsc` compilation to finish before restarting)
 
 ### Build Installer (Windows)
 

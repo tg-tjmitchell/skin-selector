@@ -53,7 +53,7 @@ async function main() {
         try {
           cpSync(join(srcDir, filename), join(outDir, filename));
           console.log(`📋 Copied ${filename}`);
-        } catch (_err) {
+        } catch {
           // File may be temporarily unavailable during an editor save
         }
       }
