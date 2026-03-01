@@ -1,1 +1,2 @@
+npm run check:node-version-sync
 npx lint-staged

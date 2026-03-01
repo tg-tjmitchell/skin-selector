@@ -16,6 +16,8 @@
     "dist": "electron-builder",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "sync:node-version": "node scripts/sync-node-version.js",
+    "check:node-version-sync": "node scripts/sync-node-version.js --check",
     "release": "release-it",
     "release:patch": "release-it patch --ci",
     "release:minor": "release-it minor --ci",
@@ -31,7 +33,7 @@
   "license": "MIT",
   "packageManager": "npm@11.6.2",
   "engines": {
-    "node": ">=24.13.0 <25.0.0",
+    "node": ">=24.14.0 <25.0.0",
     "npm": ">=11.6.2"
   },
   "dependencies": {
