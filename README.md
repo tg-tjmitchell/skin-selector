@@ -60,6 +60,24 @@ npm run dist
 
 The installer will be generated in the `dist/` folder (NSIS installer and portable executable).
 
+## Releasing
+
+Use the release scripts to bump version, changelog, commit, tag, and push:
+
+```bash
+npm run release:patch
+npm run release:minor
+npm run release:major
+```
+
+GitHub releases and artifacts are published by the existing GitHub Actions workflow on tag push (`.github/workflows/release.yml`).
+This means local releases do **not** require a personal `GITHUB_TOKEN`.
+
+Use a preview first when needed:
+
+```bash
+npm run release:dry
+```
 ## How to Use
 
 1. **Start the League of Legends client** and log in

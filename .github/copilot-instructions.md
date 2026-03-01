@@ -20,7 +20,7 @@
   - `npm run copy:static` - Copies HTML/CSS to `dist/renderer/`
 
 ### Release Process
-**Creating a new release is simple** - use `release-it` which automates versioning, changelog generation, and GitHub releases:
+**Creating a new release is simple** - use `release-it` which automates versioning, changelog generation, commits, tags, and pushes:
 
 - **Interactive Release**: `npm run release` (prompts for version bump, runs tests, creates changelog, tags, and pushes)
 - **Automated Releases**:
@@ -36,7 +36,9 @@
 4. Creates git commit with message: `chore: release v{version}`
 5. Creates git tag: `v{version}`
 6. Pushes to GitHub (triggers `.github/workflows/release.yml`)
-7. GitHub Actions builds Windows installers and creates GitHub release with artifacts
+7. GitHub Actions (`.github/workflows/release.yml`) builds Windows installers and creates GitHub release with artifacts
+
+**Token note**: local release commands should not require a personal `GITHUB_TOKEN`; GitHub release publication is handled by the Actions workflow on tag push.
 
 **Commit Message Convention** (for better changelogs):
 - `feat:` - New features (triggers minor version bump)
