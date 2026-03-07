@@ -74,6 +74,8 @@ interface DOMElements {
     queuePopupFocusToggle: HTMLInputElement;
     queuePopupFocusReadyCheckToggle: HTMLInputElement;
     queuePopupFocusLockInToggle: HTMLInputElement;
+    autoCollapseSpellsToggle: HTMLInputElement;
+    autoScrollToStepToggle: HTMLInputElement;
     settingsToggleBtn: HTMLButtonElement;
     settingsCloseBtn: HTMLButtonElement;
     settingsOverlay: HTMLElement;
@@ -212,6 +214,8 @@ class SkinSelectorUI {
     private queuePopupFocusEnabled: boolean = true;
     private queuePopupFocusReadyCheck: boolean = true;
     private queuePopupFocusLockIn: boolean = true;
+    private autoCollapseSpells: boolean = true;
+    private autoScrollToStep: boolean = true;
     private elements!: DOMElements;
     private qrGenerated: boolean = false;
     private showFavoritesOnly: boolean = false;
@@ -240,6 +244,7 @@ class SkinSelectorUI {
         this.hideQrForWeb();
         this.loadSettingsDrawerState();
         this.loadQueuePopupSettings();
+        this.loadChampSelectSettings();
         this.updateQueuePopupSettingsUI();
         this.setupEventListeners();
         this.loadAutoPickState();
@@ -309,6 +314,8 @@ class SkinSelectorUI {
             queuePopupFocusToggle: this.getElement('queuePopupFocusToggle') as HTMLInputElement,
             queuePopupFocusReadyCheckToggle: this.getElement('queuePopupFocusReadyCheckToggle') as HTMLInputElement,
             queuePopupFocusLockInToggle: this.getElement('queuePopupFocusLockInToggle') as HTMLInputElement,
+            autoCollapseSpellsToggle: this.getElement('autoCollapseSpellsToggle') as HTMLInputElement,
+            autoScrollToStepToggle: this.getElement('autoScrollToStepToggle') as HTMLInputElement,
             settingsToggleBtn: this.getElement('settingsToggleBtn') as HTMLButtonElement,
             settingsCloseBtn: this.getElement('settingsCloseBtn') as HTMLButtonElement,
             settingsOverlay: this.getElement('settingsOverlay'),
@@ -373,6 +380,21 @@ class SkinSelectorUI {
         this.elements.queuePopupFocusLockInToggle.checked = this.queuePopupFocusLockIn;
     }
 
+    private loadChampSelectSettings(): void {
+        const autoCollapse = localStorage.getItem('autoCollapseSpells');
+        if (autoCollapse !== null) {
+            this.autoCollapseSpells = autoCollapse === 'true';
+        }
+
+        const autoScroll = localStorage.getItem('autoScrollToStep');
+        if (autoScroll !== null) {
+            this.autoScrollToStep = autoScroll === 'true';
+        }
+
+        this.elements.autoCollapseSpellsToggle.checked = this.autoCollapseSpells;
+        this.elements.autoScrollToStepToggle.checked = this.autoScrollToStep;
+    }
+
     private updateQueuePopupSettingsUI(): void {
         const subToggles = [
             this.elements.queuePopupFocusReadyCheckToggle,
@@ -415,7 +437,7 @@ class SkinSelectorUI {
         this.elements.autoSelectBtn.addEventListener('click', () => this.autoSelectRandomSkin());
         this.elements.refreshBtn.addEventListener('click', () => this.refreshSkins());
         this.elements.applySpellsBtn.addEventListener('click', () => {
-            void this.applySelectedSummonerSpells(true);
+            void this.applySelectedSummonerSpells(this.autoCollapseSpells, this.autoScrollToStep);
         });
         this.elements.spell1SlotBtn.addEventListener('click', () => this.setActiveSpellSlot(1));
         this.elements.spell2SlotBtn.addEventListener('click', () => this.setActiveSpellSlot(2));
@@ -459,6 +481,24 @@ class SkinSelectorUI {
             localStorage.setItem('queuePopupFocusLockIn', this.queuePopupFocusLockIn.toString());
             this.log(
                 this.queuePopupFocusLockIn ? 'Lock-in focus enabled' : 'Lock-in focus disabled',
+                'info'
+            );
+        });
+
+        this.elements.autoCollapseSpellsToggle.addEventListener('change', () => {
+            this.autoCollapseSpells = this.elements.autoCollapseSpellsToggle.checked;
+            localStorage.setItem('autoCollapseSpells', this.autoCollapseSpells.toString());
+            this.log(
+                this.autoCollapseSpells ? 'Auto-collapse spell section enabled' : 'Auto-collapse spell section disabled',
+                'info'
+            );
+        });
+
+        this.elements.autoScrollToStepToggle.addEventListener('change', () => {
+            this.autoScrollToStep = this.elements.autoScrollToStepToggle.checked;
+            localStorage.setItem('autoScrollToStep', this.autoScrollToStep.toString());
+            this.log(
+                this.autoScrollToStep ? 'Auto-scroll to step enabled' : 'Auto-scroll to step disabled',
                 'info'
             );
         });
@@ -670,6 +710,9 @@ class SkinSelectorUI {
                 this.elements.spellSelectionArea.style.display = 'block';
                 if (enteringChampionSelect) {
                     this.setSectionCollapsed('spells', false);
+                    if (this.autoScrollToStep) {
+                        this.scrollToElement(this.elements.spellSelectionArea);
+                    }
                 }
                 const isLockedIn = !!data.lockedIn;
                 const championChanged = data.selectedChampionId && this.currentChampionId !== data.selectedChampionId;
@@ -710,6 +753,10 @@ class SkinSelectorUI {
                     if (this.favoritesOnlyMode) {
                         await this.sleep(AUTO_SELECT_DELAY_MS);
                         await this.autoSelectRandomSkin();
+                    }
+
+                    if (this.autoScrollToStep && this.isSkinSelectionVisible()) {
+                        this.scrollToElement(this.elements.skinSelectionArea);
                     }
                 }
 
@@ -1062,7 +1109,7 @@ class SkinSelectorUI {
         localStorage.setItem(`section-${sectionName}-collapsed`, collapsed.toString());
     }
 
-    private async applySelectedSummonerSpells(collapseAfterApply: boolean = false): Promise<void> {
+    private async applySelectedSummonerSpells(autoCollapseSpells: boolean = false, autoScrollToStep: boolean = false): Promise<void> {
         const spell1Id = this.selectedSpell1Id;
         const spell2Id = this.selectedSpell2Id;
 
@@ -1100,8 +1147,11 @@ class SkinSelectorUI {
             }
 
             this.log(result.message, 'success');
-            if (collapseAfterApply) {
+            if (autoCollapseSpells) {
                 this.setSectionCollapsed('spells', true);
+            }
+            if (autoScrollToStep && this.isSkinSelectionVisible()) {
+                this.scrollToElement(this.elements.skinSelectionArea);
             }
         } catch (error) {
             this.spellSyncInFlight = false;
@@ -1111,6 +1161,18 @@ class SkinSelectorUI {
         } finally {
             this.elements.applySpellsBtn.disabled = false;
         }
+    }
+
+    /**
+     * Smoothly scroll an element into view.
+     * @param element - The element to scroll into view (e.g. the spell selection area or skin selection area).
+     */
+    private scrollToElement(element: HTMLElement): void {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    private isSkinSelectionVisible(): boolean {
+        return this.elements.skinSelectionArea.style.display !== 'none';
     }
 
     private sleep(ms: number): Promise<void> {
