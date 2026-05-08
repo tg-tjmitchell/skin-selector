@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@hasagi/core": "^0.6.9",
-    "axios": "^1.13.5",
+    "axios": "^1.16.0",
     "electron-updater": "^6.7.3",
     "express": "^5.0.0",
     "qrcode": "^1.5.3"
